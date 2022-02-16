@@ -18,7 +18,7 @@ nc <- switch(tolower(Sys.getenv("_R_CHECK_LIMIT_CORES_")),
              parallel::detectCores())
 options(mc.cores = nc)
 
-setwd("D:\\MPH-Project\\Further work")
+setwd("D:\\MPH-Project\\Further work\\paper")
 memory.limit(size=40000) # set memory
 
 #####################################################################
@@ -36,70 +36,6 @@ full_ipd <- filter(full_ipd, complete) %>%
   mutate(cat_pasi = ifelse(pasi75 == 1, "yes", "no"),
          sub_age = ifelse(age>=46, "gt or eq 46", "lt 46"),
          durncat = ifelse(durnpso < 17, "lt 17", "ge 17"))
-
-## Distribution of duration by study, treatment
-full.crs.durn <- full_ipd %>%
-  count(studyc, trtc, cat_pasi, durncat)
-
-ggplot(full.crs.durn) +
-  geom_bar(aes(x=durncat, y=n, fill = cat_pasi), stat = "identity") +
-  facet_wrap(vars(studyc, trtc)) +
-  labs(title = "Distribution before simulation by trials, studies")+
-  guides(fill=guide_legend(title="pasi75")) +
-  xlab("Duration group") +
-  ylab("Frequency")
-
-
-#####################################################################
-##                          Data preparation                       ##
-#####################################################################
-## nest data
-full_ipd.muta <- full_ipd %>%
-  group_by(studyc) %>%
-  nest()
-
-## create model and then predict the f(pasi75)
-set.seed(1234)
-
-full_ipd.muta$data <- map(full_ipd.muta$data, function(df){
-  a <- glm(pasi75 ~ age*trtc + bmi*trtc + male*trtc + bsa*trtc + weight*trtc + durnpso*trtc, family = "binomial", data = df, na.action = "na.exclude")
-  df %>%
-    mutate(lp = predict(a, type = "link"))
-})
-
-full_ipd.muta$data <- map(full_ipd.muta$data, function(df){
-  df %>%
-    mutate(
-      ## case one: what we have done when the subgroup var is age instead of durnpso
-      # lp2 = if_else(durnpso < 17 & trtc %in% c("PBO"),  lp - 0.2, lp),
-      lp2 = if_else(durnpso < 17 & trtc %in% c("PBO"),  lp - 0.2, lp),
-      lp2 = if_else(durnpso < 17 & !trtc %in% c("PBO"), lp2 + 0.2, lp2),
-
-      ## case two: increase the event rate for durnpso < 17 in placebo group
-      # lp2 = if_else(durnpso < 17 & trtc %in% c("PBO"),  lp - 2, lp),
-      # lp2 = if_else(durnpso < 17 & !trtc %in% c("PBO"), lp2 + 0.2, lp2))})
-
-      risk = plogis(lp2),
-      ## Next line is stochastic
-      pasi75_sim = rbinom(n = length(lp2), size = 1, prob = risk))
-})
-
-full_ipd <- full_ipd.muta %>%
-  unnest(data) %>%
-  filter(!is.na(pasi75_sim))
-
-full.crs2 <- full_ipd %>%
-  mutate(cat_pasi = ifelse(pasi75_sim == 1, "yes", "no"),
-         durncat = ifelse(durnpso < 17, "lt 17", "ge 17")) %>%
-  count(studyc, trtc, cat_pasi, durncat)
-
-## histogram by studyc after redistribution
-ggplot(full.crs2) +
-  geom_bar(aes(x=durncat, y=n, fill = cat_pasi), stat = "identity") +
-  facet_wrap(vars(studyc, trtc)) +
-  labs(title = "Distribution after simulation by trials, studies") +
-  guides(fill=guide_legend(title="pasi75"))
-
 
 #####################################################################
 ##                          Data preparation                       ##
@@ -158,7 +94,7 @@ ipd_agd <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long), "IPD")
 ## convert IPD to duration-specific subgroup IPD
 agd_sub_durn <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long, sub_durn), "SUB")
 
-## convert IPD to duration-specific subgroup IPD
+## convert IPD to age-specific subgroup IPD
 agd_sub_age <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long, sub_age), "SUB")
 
 ## combine AGD with study level/treatment level subgroup
@@ -166,21 +102,32 @@ sub_agd1 <- bind_rows(ipd_agd,
                       agd_sub_durn, 
                       agd_sub_age)
 
-func.mult <- function(res_var, agd.dt, col_name, value1, value2, mode) {
+func.mult <- function(res_var, agd.dt, col_name, value1, value2, ipd) {
   
-  filter_criteria1 <- interp(~y %in% x, .values=list(y = as.name(col_name), x = value1))
+  if (ipd == "Y") {
+      net_org <- combine_network(
+        set_ipd(sub_ipd,
+              study = studyc, 
+              trt = trtc, 
+              r = {{res_var}},
+              trt_class = trtclass, 
+              trt_ref = "PBO"),
+              trt_ref = "PBO")
+  }
+  else {
+      filter_criteria1 <- interp(~y %in% x, .values=list(y = as.name(col_name), x = value1))
+    
+      filter_criteria2 <- interp(~y %in% x, .values=list(y = as.name(col_name), x = value2))
   
-  filter_criteria2 <- interp(~y %in% x, .values=list(y = as.name(col_name), x = value2))
-  
-  net_org <- combine_network(
-    set_ipd(sub_ipd %>% filter_(filter_criteria1),
+      net_org <- combine_network(
+        set_ipd(sub_ipd %>% filter_(filter_criteria1),
             study = studyc, 
             trt = trtc, 
             r = {{res_var}},
             trt_class = trtclass, 
             trt_ref = "PBO"),
     
-    set_agd_arm(agd.dt %>% filter_(filter_criteria2), 
+        set_agd_arm(agd.dt %>% filter_(filter_criteria2), 
                 study = studyc, 
                 trt = trtc, 
                 r = pasi75_r, 
@@ -188,24 +135,15 @@ func.mult <- function(res_var, agd.dt, col_name, value1, value2, mode) {
                 trt_class = trtclass,
                 trt_ref = "PBO"),
     trt_ref = "PBO"
-  )
-  
+  )}
+
   # net_org
-  # 
   netplot <- plot(net_org, weight_nodes = T, weight_edges = T, show_trt_class = T) +
     ggplot2::theme(legend.position = "bottom", legend.box = "vertical")
   
   ## Add integration points of to the AgD studies in the network
   
-  if (mode == "multi") {
-  net_org <- add_integration(net_org,
-                             durnpso = distr(qgamma, mean = durnpso_mean, sd = durnpso_sd),
-                             prevsys = distr(qbern, prob = prevsys),
-                             bsa = distr(qlogitnorm, mean = bsa_mean, sd = bsa_sd),
-                             weight = distr(qgamma, mean = weight_mean, sd = weight_sd),
-                             psa = distr(qbern, prob = psa),
-                             age = distr(qgamma, mean = weight_mean, sd = weight_sd),
-                             n_int = 1000)
+  if (ipd == "Y") {
   ## fixed effect NL-NMR
   FE_net_org <- nma(net_org, 
                     trt_effects = "fixed",
@@ -220,16 +158,21 @@ func.mult <- function(res_var, agd.dt, col_name, value1, value2, mode) {
                     QR = TRUE)
   }
   
-  else if (mode == "single") {
+  else {
     net_org <- add_integration(net_org,
                                durnpso = distr(qgamma, mean = durnpso_mean, sd = durnpso_sd),
+                               prevsys = distr(qbern, prob = prevsys),
+                               bsa = distr(qlogitnorm, mean = bsa_mean, sd = bsa_sd),
+                               weight = distr(qgamma, mean = weight_mean, sd = weight_sd),
+                               psa = distr(qbern, prob = psa),
+                               age = distr(qgamma, mean = weight_mean, sd = weight_sd),
                                n_int = 1000)
     ## fixed effect NL-NMR
     FE_net_org <- nma(net_org, 
                       trt_effects = "fixed",
                       link = "probit", 
                       likelihood = "bernoulli2",
-                      regression = ~(durnpso)*.trt,
+                      regression = ~(durnpso + prevsys + bsa + weight + psa + age)*.trt,
                       class_interactions = "common",
                       prior_intercept = normal(scale = 10),
                       prior_trt = normal(scale = 10),
@@ -242,141 +185,46 @@ func.mult <- function(res_var, agd.dt, col_name, value1, value2, mode) {
   
 }
 
-#####################################################################
-##                        Original IPD+AGD                         ##
-#####################################################################
-
-# 4 IPD + 5 AgD
-FE_net_durn <- func.mult(pasi75, sub_agd, "studyc",
-                           c("IXORA", "UNCOVER-1", "UNCOVER-2", "UNCOVER-3"),
-                           c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                             "JUNCTURE"), "multi")
-
-## Choosing Uncover-3 as chosen IPD
-## 3 IPD + 1 sub-group IPD aggregated + 5 AgD
-FE_net_durn_agd.1.1 <- func.mult(pasi75, sub_agd1, "studyc",
-                                  c("IXORA", "UNCOVER-1", "UNCOVER-2"),
-                                  c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                    "JUNCTURE", "UNCOVER-3 IPD"), "multi")
-
- ## 3 IPD + 1 no-sub-groups IPD + 5 AgD
-FE_net_durn_agd.1.2 <- func.mult(pasi75, sub_agd1, "studyc",
-                                  c("IXORA", "UNCOVER-1", "UNCOVER-2"),
-                                  c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                    "JUNCTURE", "UNCOVER-3 SUB"), "multi")
-
-## save the result
-rlist::list.save(FE_net_durn, 'D:\\MPH-Project\\Further work\\FE_net_durn.rdata')
-rlist::list.save(FE_net_durn_agd.1.1, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.1.1.rdata')
-rlist::list.save(FE_net_durn_agd.1.2, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.1.2.rdata')
-
-
-FE_net_durn_agd.2.1 <- func.mult(pasi75, sub_agd1, "studyc",
-                                 c("UNCOVER-3"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "UNCOVER-1 IPD", "UNCOVER-2 IPD", "IXORA IPD"), "multi")
-
-## 3 IPD + 1 no-sub-groups IPD + 5 AgD
-FE_net_durn_agd.2.2 <- func.mult(pasi75, sub_agd1, "studyc",
-                                 c("UNCOVER-3"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "IXORA SUB", "UNCOVER-1 SUB", "UNCOVER-2 SUB"), "multi")
-
-
-rlist::list.save(FE_net_durn_agd.2.1, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.2.1.rdata')
-rlist::list.save(FE_net_durn_agd.2.2, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.2.2.rdata')
-
-## simulated scenario
-## 1 IPD + 3 sub-groups IPD + 5 AgD
-FE_net_durn.2 <- func.mult(pasi75_sim, sub_agd, "studyc",
-                           c("IXORA", "UNCOVER-1", "UNCOVER-2", "UNCOVER-3"),
-                           c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                             "JUNCTURE"), "multi")
-
-FE_net_durn_agd.3.1 <- func.mult(pasi75_sim, sub_agd1, "studyc",
-                                 c("UNCOVER-3"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "UNCOVER-1 IPD", "UNCOVER-2 IPD", "IXORA IPD"), "multi")
-
-## 1 IPD + 3 no-sub-groups IPD + 5 AgD
-FE_net_durn_agd.3.2 <- func.mult(pasi75_sim, sub_agd1, "studyc",
-                                 c("UNCOVER-3"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "IXORA SUB", "UNCOVER-1 SUB", "UNCOVER-2 SUB"), "multi")
-
-rlist::list.save(FE_net_durn.2, 'D:\\MPH-Project\\Further work\\model with higher interaction in plb group\\FE_net_durn.2.rdata')
-rlist::list.save(FE_net_durn_agd.3.1, 'D:\\MPH-Project\\Further work\\model with higher interaction in plb group\\FE_net_durn_agd.3.1.rdata')
-rlist::list.save(FE_net_durn_agd.3.2, 'D:\\MPH-Project\\Further work\\model with higher interaction in plb group\\FE_net_durn_agd.3.2.rdata')
-
-rlist::list.save(FE_net_durn.2, 'D:\\MPH-Project\\Further work\\FE_net_durn.2.rdata')
-rlist::list.save(FE_net_durn_agd.3.1, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.3.1.rdata')
-rlist::list.save(FE_net_durn_agd.3.2, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.3.2.rdata')
-
-## Only include durnpso in the NMA
+## Using duration of psoriasis as subgroup
 
 #####################################################################
 ##                        Original IPD+AGD                         ##
 #####################################################################
 
-# 4 IPD + 5 AgD
-FE_net_durn.s <- func.mult(pasi75, sub_agd, "studyc",
-                         c("IXORA", "UNCOVER-1", "UNCOVER-2", "UNCOVER-3"),
-                         c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                           "JUNCTURE"), "single")
+# 4 IPD
+FE_ipd <- func.mult(pasi75, ,"studyc" , , ,"Y")
 
 ## Choosing Uncover-3 as chosen IPD
-## 3 IPD + 1 sub-group IPD aggregated + 5 AgD
-FE_net_durn_agd.1.1.s <- func.mult(pasi75, sub_agd1, "studyc",
-                                 c("IXORA", "UNCOVER-1", "UNCOVER-2"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "UNCOVER-3 IPD"), "single")
+## 3 IPD + 1 sub-group IPD aggregated
+FE_ml_ipd <- func.mult(pasi75, ipd_agd, "studyc",
+                                  c("IXORA", "UNCOVER-1", "UNCOVER-2"),
+                                  c("UNCOVER-3 IPD"))
 
-## 3 IPD + 1 no-sub-groups IPD + 5 AgD
-FE_net_durn_agd.1.2.s <- func.mult(pasi75, sub_agd1, "studyc",
-                                 c("IXORA", "UNCOVER-1", "UNCOVER-2"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "UNCOVER-3 SUB"), "single")
+ ## 3 IPD + 1 no-sub-groups IPD
+FE_age_ml_sub <- func.mult(pasi75, agd_sub_age, "studyc",
+                                  c("IXORA", "UNCOVER-1", "UNCOVER-2"),
+                                  c("UNCOVER-3 SUB"))
 
 ## save the result
-rlist::list.save(FE_net_durn.s, 'D:\\MPH-Project\\Further work\\FE_net_durn.s.rdata')
-rlist::list.save(FE_net_durn_agd.1.1.s, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.1.1.s.rdata')
-rlist::list.save(FE_net_durn_agd.1.2.s, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.1.2.s.rdata')
+rlist::list.save(FE_ipd, 'D:\\MPH-Project\\Further work\\paper\\FE_ipd.rdata')
+rlist::list.save(FE_age_ml_ipd, 'D:\\MPH-Project\\Further work\\paper\\FE_age_ml_ipd.rdata')
+rlist::list.save(FE_age_ml_sub, 'D:\\MPH-Project\\Further work\\paper\\FE_age_ml_sub.rdata')
 
 
-FE_net_durn_agd.2.1.s <- func.mult(pasi75, sub_agd1, "studyc",
-                                 c("UNCOVER-3"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "UNCOVER-1 IPD", "UNCOVER-2 IPD", "IXORA IPD"), "single")
 
-## 3 IPD + 1 no-sub-groups IPD + 5 AgD
-FE_net_durn_agd.2.2.s <- func.mult(pasi75, sub_agd1, "studyc",
-                                 c("UNCOVER-3"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "IXORA SUB", "UNCOVER-1 SUB", "UNCOVER-2 SUB"), "single")
+## Using duration of psoriasis as subgroup
 
+#####################################################################
+##                        Original IPD+AGD                         ##
+#####################################################################
 
-rlist::list.save(FE_net_durn_agd.2.1.s, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.2.1.s.rdata')
-rlist::list.save(FE_net_durn_agd.2.2.s, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.2.2.s.rdata')
+## Choosing Uncover-3 as chosen IPD
 
-## simulated scenario
-## 1 IPD + 3 sub-groups IPD + 5 AgD
-FE_net_durn.2.s <- func.mult(pasi75_sim, sub_agd, "studyc",
-                           c("IXORA", "UNCOVER-1", "UNCOVER-2", "UNCOVER-3"),
-                           c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                             "JUNCTURE"), "single")
+## 3 IPD + 1 no-sub-groups IPD
+FE_durn_ml_sub <- func.mult(pasi75, agd_sub_durn, "studyc",
+                           c("IXORA", "UNCOVER-1", "UNCOVER-2"),
+                           c("UNCOVER-3 SUB"))
 
-FE_net_durn_agd.3.1.s <- func.mult(pasi75_sim, sub_agd1, "studyc",
-                                 c("UNCOVER-3"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "UNCOVER-1 IPD", "UNCOVER-2 IPD", "IXORA IPD"), "single")
-
-## 1 IPD + 3 no-sub-groups IPD + 5 AgD
-FE_net_durn_agd.3.2.s <- func.mult(pasi75_sim, sub_agd1, "studyc",
-                                 c("UNCOVER-3"),
-                                 c("FIXTURE", "ERASURE", "CLEAR", "FEATURE",
-                                   "JUNCTURE", "IXORA SUB", "UNCOVER-1 SUB", "UNCOVER-2 SUB"), "single")
-
-rlist::list.save(FE_net_durn.2.s, 'D:\\MPH-Project\\Further work\\FE_net_durn.2.s.rdata')
-rlist::list.save(FE_net_durn_agd.3.1.s, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.3.1.s.rdata')
-rlist::list.save(FE_net_durn_agd.3.2.s, 'D:\\MPH-Project\\Further work\\FE_net_durn_agd.3.2.s.rdata')
+## save the result
+rlist::list.save(FE_durn_ml_sub, 'D:\\MPH-Project\\Further work\\paper\\FE_durn_ml_sub.rdata')
 
