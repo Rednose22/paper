@@ -1,0 +1,277 @@
+---
+output:
+  pdf_document:
+  latex_engine: lualatex
+fontsize: 11pt
+mainfont: Arial
+toc: false
+---
+
+```{r setup, include=FALSE}
+#####################################################################
+##                        Program set up                           ##
+#####################################################################
+library(multinma)
+library(tidyverse)
+library(lazyeval)
+library(data.table)
+library(purrr)
+library(kableExtra)
+library(rlist) ## save the list as rdata
+library(stringr)
+library(qdapRegex)
+library(gridExtra)
+library(lemon)
+
+options(mc.cores = parallel::detectCores())
+
+nc <- switch(tolower(Sys.getenv("_R_CHECK_LIMIT_CORES_")), 
+             "true" =, "warn" = 2, 
+             parallel::detectCores())
+options(mc.cores = nc)
+
+memory.limit(size=40000) # set memory
+
+## checking the missing data
+full_ipd <- plaque_psoriasis_ipd %>%
+  mutate(   # Check complete cases for covariates of interest
+    complete = complete.cases(durnpso, prevsys, bsa, weight, psa, age, male))
+
+# calculate the sum and mean for the missing records
+s.comp <- sum(!full_ipd$complete)
+mean.comp <- mean(!full_ipd$complete)
+
+# remove the missing data
+full_ipd <- filter(full_ipd, complete) %>%
+  mutate(cat_pasi = ifelse(pasi75 == 1, "yes", "no"),
+         sub_age = ifelse(age>=46, "gt or eq 46", "lt 46"),
+         durncat = ifelse(durnpso < 17, "lt 17", "ge 17"))
+
+full_agd <- plaque_psoriasis_agd
+
+## forest plot function
+coe.forest.fig <- function(filter_1, x1, y1, x2, ypot, dt=coeff.mod.f, rfl=0, fa) {
+  ## check the existence of filter_1 
+  ggplot(if (missing(filter_1)) {dt}
+         else {dt %>% filter(grepl(filter_1, parameter)) %>% mutate(parameter = ifelse(grepl('mu', parameter), substring(parameter, 4, nchar(parameter)-1), ifelse(grepl('beta', parameter), substring(parameter, 6, nchar(parameter)-1), substring(parameter, 3, nchar(parameter)-1))))}, 
+         aes(x = mean, y = parameter, color = scenario)) +
+    ## draw the dot of barchart
+    geom_point(aes(x = mean, y = parameter, color = scenario), position = position_dodge2(width = ypot, reverse = TRUE)) +
+    geom_point(aes(x = upper, y = parameter, color = scenario), position = position_dodge2(width = ypot, reverse = TRUE), shape = "|", size = 3) +
+    geom_point(aes(x = lower, y = parameter, color = scenario), position = position_dodge2(width = ypot, reverse = TRUE), shape = "|", size = 3) +
+    ## draw the line of barchart
+    geom_linerange(aes(xmax = upper, xmin = lower), position = position_dodge2(width = ypot, reverse = TRUE)) +
+    ## draw the reference line
+    geom_vline(xintercept=rfl, color="black", linetype="dashed", alpha=.5) +
+    ## draw the text
+    geom_text(aes(x = x2, label = `Mean (95% CI)`), position = position_dodge2(width = ypot, reverse = TRUE)) +
+    scale_x_continuous(limits = c(x1, y1)) + 
+    scale_color_manual(values=color2) +
+    ylab(" ") +
+    xlab("Value") +
+    theme_bw() +
+    theme(panel.border = element_blank(),
+          axis.line = element_line(colour = "black"),
+          legend.title = element_blank(), 
+          legend.position='bottom')
+}
+
+## acquire the file path under the specified folder
+path_durn <- function(path_result){
+    setwd(path_result)
+
+    temp <- list.files(path=path_result, pattern="*.rdata")
+
+    ## get the file path
+    temp.list <- map(temp, function(x) {paste0(path_result, x)})
+
+    return(temp.list)
+}
+
+## color mapping
+color2 <- c("#ff8503", "#b4549e", "#15516d")
+
+## Combine a list of model result
+extrac.list <- function (list.new) {
+  listof.coeff <- list()
+  listof.dic <- list()
+  listof.resd <- list()
+  listof.pd <- list()
+  listof.releff <- list()
+  
+  for (i in 1:length(list.new)) {
+    
+    ## coefficient
+    dt.out <- summary(list.new[[i]], "d", "beta", "mu") %>%
+      as_tibble() %>% 
+      select(parameter, mean, sd, `2.5%`, `97.5%`) %>%
+      # mutate_if(is.numeric, round, digits = 2) %>%
+      rename(lower = `2.5%`, upper = `97.5%`) %>%
+      mutate(id = i)
+    
+    ## model fit
+    mf.out <- dic(list.new[[i]])
+    
+    dic <- mf.out[["dic"]]
+    pd <-  mf.out[["pd"]]
+    resd <-  mf.out[["resdev"]]
+    
+    ## relative treatment
+    rt_fig <- relative_effects(list.new[[i]])[["summary"]]%>%   as_tibble() %>% 
+      select(parameter, mean, sd, `2.5%`, `97.5%`, `.study`) %>%
+      # mutate_if(is.numeric, round, digits = 2) %>%
+      rename(lower = `2.5%`, upper = `97.5%`) %>%
+      mutate(id = i)
+    
+    listof.coeff[[i]] <- dt.out
+    listof.dic[[i]] <- dic
+    listof.pd[[i]] <- pd
+    listof.resd[[i]] <- resd
+    listof.releff[[i]] <- rt_fig
+    
+  }
+  
+  comb.list <- list(listof.coeff, listof.dic, listof.pd, listof.resd, listof.releff)
+  return(comb.list)
+}
+
+## get the path
+temp.list <- path_durn("D:\\MPH-Project\\Further work\\paper\\UNCOVER-3\\")
+
+## load the model of gold standard
+FE_ipd.1 <- list.load(temp.list[[1]])
+FE_ipd.2 <- list.load(temp.list[[2]])
+
+```
+
+# Age
+
+```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
+
+## age sub-grouped IPD
+FE_ipd.3 <- list.load(temp.list[[3]])
+
+re.list <- list(FE_ipd.1, FE_ipd.2, FE_ipd.3)
+
+comb.list.age <- extrac.list(re.list)
+
+## draw the figures
+coeff.mod1.f.org <- do.call("bind_rows", comb.list.age[[1]]) %>%
+  mutate(scenario = case_when(id %in% c(1) ~ "Base scenario", 
+                              id %in% c(2) ~ "No sub-groups scenario",
+                              id %in% c(3) ~ "Sub-groups scenario")) %>%
+  group_by(parameter, scenario) %>%
+  summarise_at(c("mean", "lower", "upper"), mean) %>%
+  mutate_if(is.numeric, round, digits = 3) %>%
+  mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
+         ## factorize the scenario
+         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario"))) %>%
+  arrange(parameter, scenario)
+
+## forest figure
+study1_age <- coe.forest.fig("age",
+  # paste(c('durnpso', '^d'),collapse="|"), 
+  -4, 2, -2.7, 0.6, coeff.mod1.f.org) +
+  labs(title = "Comparison of coefficient of model")
+study1_age
+
+# save(study1_durn, file = "study1_durn.RData")
+```
+
+## Age
+
+```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
+
+coeff.mod1.rel.org <- do.call("bind_rows", comb.list.age[[5]]) %>%
+    mutate(scenario = case_when(id %in% c(1) ~ "Base scenario",
+                                id %in% c(2) ~ "No sub-groups scenario",
+                               id %in% c(3) ~ "Sub-groups scenario"),
+           ## mutate the parameter to be the treatment group
+          parameter = str_sub(sub(".*: ", "", parameter), -10, -2)) %>%
+  group_by(scenario, `.study`, parameter) %>%
+  filter(`.study` == "UNCOVER-3") %>%
+  summarise_at(c("mean", "lower", "upper"), mean) %>%
+  mutate_if(is.numeric, round, digits = 3) %>%
+  mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
+         ## factorize the scenario
+         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario"))) %>%
+  arrange(parameter, scenario)
+
+study1_rr <- coe.forest.fig(,-2, 4, -1, 0.5, coeff.mod1.rel.org) +
+  labs(title = "Comparison of population-adjusted relative treatment effects")
+
+study1_rr
+# save(study1_rr, file = "study1_rr.RData")
+
+```
+
+## Duration of psoriasis
+
+```{r echo=FALSE, error=FALSE, fig.align='!c', fig.height=8, fig.pos="H", fig.show="hold", fig.width=8, message=FALSE, warning=FALSE, eval=TRUE}
+##################################################################
+############    duration of psoriasis ##############################
+##################################################################
+
+## study two
+FE_ipd.4 <- list.load(temp.list[[4]])
+
+## combine as a list
+re.list.2 <- list(FE_ipd.1, FE_ipd.2, FE_ipd.4)
+
+## Extract the model result from the combined list
+comb.list.durn <- extrac.list(re.list.2)
+
+coeff.mod1.f.2 <- do.call("bind_rows", comb.list.durn[[1]]) %>%
+  mutate(scenario = case_when(id %in% c(1) ~ "Base scenario", 
+                              id %in% c(2) ~ "No sub-groups scenario",
+                              id %in% c(3) ~ "Sub-groups scenario")) %>%
+  mutate_if(is.numeric, round, digits = 3) %>%
+  mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
+         ## factorize the scenario
+         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario"))) %>%
+  arrange(parameter, scenario)
+
+## duration of psoriasis
+study2_durn <- coe.forest.fig("durnpso",
+  # paste(c('durnpso', '^d'),collapse="|"), 
+  -4, 2, -2.7, 0.6, coeff.mod1.f.2)+
+  labs(title = "Comparison of coefficients of duration of psoriasis in study two")
+study2_durn
+# save(study2_durn, file = "study2_durn.RData")
+```
+
+## Duration of psoriasis
+
+```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
+
+coeff.mod.f.rel2 <- do.call("bind_rows", comb.list.durn[[5]]) %>%
+    mutate(scenario = case_when(id %in% c(1) ~ "Base scenario",
+                              id %in% c(2) ~ "No sub-groups scenario",
+                              id %in% c(3) ~ "Sub-groups scenario"),
+           ## mutate the parameter
+          parameter = str_sub(sub(".*: ", "", parameter), -10, -2)) %>%
+  group_by(scenario, `.study`, parameter) %>%
+  filter(`.study` == "UNCOVER-3") %>%
+  summarise_at(c("mean", "lower", "upper"), mean) %>%
+  mutate_if(is.numeric, round, digits = 3) %>%
+  mutate("Mean (95% CI)" = paste0(mean, " (", lower, ", ", upper, ")"),
+         ## factorize the scenario
+         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario")))
+
+study2_rr <- coe.forest.fig(,-2, 4, -1, 0.5, coeff.mod.f.rel2) +
+  labs(title = "Comparison of population-adjusted relative treatment effects")
+
+study2_rr
+
+# save(study2_rr, file = "study2_rr.RData")
+
+# plot(FE_ipd.2[["network"]], weight_nodes = TRUE, weight_edges = TRUE, show_trt_class = TRUE) + 
+#   ggplot2::theme(legend.position = "bottom", legend.box = "vertical")
+
+
+```
+
+```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
+# plot(FE_ipd.3[["network"]], weight_nodes = TRUE, weight_edges = TRUE, show_trt_class = TRUE) + 
+#   ggplot2::theme(legend.position = "bottom", legend.box = "vertical")
+```
