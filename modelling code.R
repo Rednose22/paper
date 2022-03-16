@@ -34,13 +34,15 @@ full_ipd <- plaque_psoriasis_ipd %>%
 # remove the missing data
 full_ipd <- filter(full_ipd, complete) %>%
   mutate(cat_pasi = ifelse(pasi75 == 1, "yes", "no"),
-         sub_age = ifelse(age>=46, "gt or eq 46", "lt 46"),
-         durncat = ifelse(durnpso < 17, "lt 17", "ge 17"))
+         sub_age = ifelse(age >= 46, "gt or eq 46", "lt 46"),
+         sub_durn = ifelse(durnpso < 17, "lt 17", "ge 17"))
 
+full_age <- plaque_psoriasis_agd
 #####################################################################
 ##                          Data preparation                       ##
 #####################################################################
 
+set.seed(1234)
 ## Data transformation in IPD
 sub_ipd <- full_ipd %>% 
   mutate(# Variable transformations
@@ -53,9 +55,7 @@ sub_ipd <- full_ipd %>%
     # Treatment classes
     trtclass = case_when(trtn == 1 ~ "Placebo",
                          trtn %in% c(2, 3, 5, 6, 7) ~ "IL blocker",
-                         trtn == 4 ~ "TNFa blocker"),
-    sub_durn = ifelse(durnpso < 1.7, "1", "2"),
-    male = ifelse(male == "TRUE", 1, 0))
+                         trtn == 4 ~ "TNFa blocker"))
 
 ## subgroup result generated from IPD
 ## five covariate durnpso, prevsys, bsa, weight, psa, age
@@ -97,11 +97,9 @@ agd_sub_durn <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long, sub_d
 ## convert IPD to age-specific subgroup IPD
 agd_sub_age <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long, sub_age), "SUB")
 
-## combine AGD with study level/treatment level subgroup
-sub_agd1 <- bind_rows(ipd_agd,
-                      agd_sub_durn, 
-                      agd_sub_age)
+set.seed(1234)
 
+## Define a function of modelling process
 func.mult <- function(res_var, agd.dt, col_name, value1, value2, ipd) {
   
   if (ipd == "Y") {
@@ -165,7 +163,7 @@ func.mult <- function(res_var, agd.dt, col_name, value1, value2, ipd) {
                                bsa = distr(qlogitnorm, mean = bsa_mean, sd = bsa_sd),
                                weight = distr(qgamma, mean = weight_mean, sd = weight_sd),
                                psa = distr(qbern, prob = psa),
-                               age = distr(qgamma, mean = weight_mean, sd = weight_sd),
+                               age = distr(qgamma, mean = age_mean, sd = age_sd),
                                n_int = 1000)
     ## fixed effect NL-NMR
     FE_net_org <- nma(net_org, 
@@ -185,46 +183,62 @@ func.mult <- function(res_var, agd.dt, col_name, value1, value2, ipd) {
   
 }
 
-## Using duration of psoriasis as subgroup
 
 #####################################################################
-##                        Original IPD+AGD                         ##
+##                        Original IPD + AGD                       ##
 #####################################################################
 
 # 4 IPD
-FE_ipd <- func.mult(pasi75, ,"studyc" , , ,"Y")
+FE_ipd.1 <- func.mult(pasi75, ,"studyc" , , , "Y")
+
+rlist::list.save(FE_ipd.1, 'D:\\MPH-Project\\Further work\\paper\\FE_ipd.1.rdata')
 
 ## Choosing Uncover-3 as chosen IPD
-## 3 IPD + 1 sub-group IPD aggregated
-FE_ml_ipd <- func.mult(pasi75, ipd_agd, "studyc",
-                                  c("IXORA", "UNCOVER-1", "UNCOVER-2"),
-                                  c("UNCOVER-3 IPD"))
+## 1 IPD + 3 no sub-group IPD aggregated
+FE_ipd.2 <- func.mult(pasi75, ipd_agd, "studyc",
+                      c("UNCOVER-3"),
+                      c("IXORA-S IPD", "UNCOVER-1 IPD"), "N")
 
- ## 3 IPD + 1 no-sub-groups IPD
-FE_age_ml_sub <- func.mult(pasi75, agd_sub_age, "studyc",
-                                  c("IXORA", "UNCOVER-1", "UNCOVER-2"),
-                                  c("UNCOVER-3 SUB"))
-
-## save the result
-rlist::list.save(FE_ipd, 'D:\\MPH-Project\\Further work\\paper\\FE_ipd.rdata')
-rlist::list.save(FE_age_ml_ipd, 'D:\\MPH-Project\\Further work\\paper\\FE_age_ml_ipd.rdata')
-rlist::list.save(FE_age_ml_sub, 'D:\\MPH-Project\\Further work\\paper\\FE_age_ml_sub.rdata')
-
-
+## Using age as subgroup
+## 1 IPD + 3 sub-groups IPD
+FE_ipd.3 <- func.mult(pasi75, agd_sub_age, "studyc",
+                           c("UNCOVER-3"),
+                           c("IXORA-S SUB", "UNCOVER-1 SUB", "UNCOVER-2 SUB"), "N")
 
 ## Using duration of psoriasis as subgroup
-
-#####################################################################
-##                        Original IPD+AGD                         ##
-#####################################################################
-
 ## Choosing Uncover-3 as chosen IPD
-
-## 3 IPD + 1 no-sub-groups IPD
-FE_durn_ml_sub <- func.mult(pasi75, agd_sub_durn, "studyc",
-                           c("IXORA", "UNCOVER-1", "UNCOVER-2"),
-                           c("UNCOVER-3 SUB"))
+## 1 IPD + 3 sub-groups IPD
+FE_ipd.4 <- func.mult(pasi75, agd_sub_durn, "studyc",
+                      c("UNCOVER-3"),
+                      c("IXORA-S SUB", "UNCOVER-1 SUB", "UNCOVER-2 SUB"), "N")
 
 ## save the result
-rlist::list.save(FE_durn_ml_sub, 'D:\\MPH-Project\\Further work\\paper\\FE_durn_ml_sub.rdata')
+rlist::list.save(FE_ipd.2, 'D:\\MPH-Project\\Further work\\paper\\UNCOVER-3\\FE_ipd.2.rdata')
+rlist::list.save(FE_ipd.3, 'D:\\MPH-Project\\Further work\\paper\\UNCOVER-3\\FE_ipd.3.rdata')
+rlist::list.save(FE_ipd.4, 'D:\\MPH-Project\\Further work\\paper\\UNCOVER-3\\FE_ipd.4.rdata')
+
+##################################################################################################
+## Choosing Uncover-3 as chosen IPD
+## 1 IPD + 3 no sub-group IPD aggregated
+FE_ipd.2 <- func.mult(pasi75, ipd_agd, "studyc",
+                      c("UNCOVER-2"),
+                      c("IXORA-S IPD", "UNCOVER-1 IPD", "UNCOVER-3 IPD"), "N")
+
+## Using age as subgroup
+## 1 IPD + 3 sub-groups IPD
+FE_ipd.3 <- func.mult(pasi75, agd_sub_age, "studyc",
+                      c("UNCOVER-2"),
+                      c("IXORA-S SUB", "UNCOVER-1 SUB", "UNCOVER-3 SUB"), "N")
+
+## Using duration of psoriasis as subgroup
+## Choosing Uncover-3 as chosen IPD
+## 1 IPD + 3 sub-groups IPD
+FE_ipd.4 <- func.mult(pasi75, agd_sub_durn, "studyc",
+                      c("UNCOVER-2"),
+                      c("IXORA-S SUB", "UNCOVER-1 SUB", "UNCOVER-3 SUB"), "N")
+
+## save the result
+rlist::list.save(FE_ipd.2, 'D:\\MPH-Project\\Further work\\paper\\FE_ipd.2.rdata')
+rlist::list.save(FE_ipd.3, 'D:\\MPH-Project\\Further work\\paper\\FE_ipd.3.rdata')
+rlist::list.save(FE_ipd.4, 'D:\\MPH-Project\\Further work\\paper\\FE_ipd.4.rdata')
 

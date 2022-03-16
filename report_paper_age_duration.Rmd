@@ -43,17 +43,11 @@ mean.comp <- mean(!full_ipd$complete)
 
 # remove the missing data
 full_ipd <- filter(full_ipd, complete) %>%
-  mutate(cat_pasi = ifelse(pasi75 == 1, "yes", "no"))
+  mutate(cat_pasi = ifelse(pasi75 == 1, "yes", "no"),
+         sub_age = ifelse(age>=46, "gt or eq 46", "lt 46"),
+         durncat = ifelse(durnpso < 17, "lt 17", "ge 17"))
 
 full_agd <- plaque_psoriasis_agd
-
-new_agd <- tibble(
-                bsa = 0.6,
-                prevsys = 0.1,
-                psa = 0.2,
-                weight = 10,
-                durnpso = 3,
-                age = 2)
 
 ## forest plot function
 coe.forest.fig <- function(filter_1, x1, y1, x2, ypot, dt=coeff.mod.f, rfl=0, fa) {
@@ -142,290 +136,129 @@ extrac.list <- function (list.new) {
 }
 
 ## get the path
-temp.list <- path_durn("D:\\MPH-Project\\Further work\\")
+temp.list <- path_durn("D:\\MPH-Project\\Further work\\paper\\UNCOVER-3\\")
 
 ## load the model of gold standard
-FE_net_durn <- list.load(temp.list[[2]])
-FE_net_durn.2 <- list.load(temp.list[[1]])
+FE_ipd.1 <- list.load(temp.list[[1]])
+FE_ipd.2 <- list.load(temp.list[[2]])
 
 ```
 
-# Duration of Psoriasis
-## Study one (base case)
+# Age
 
-```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=FALSE}
+```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
 
-## study one
-FE_net_durn_agd.1.1 <- list.load(temp.list[[3]])
-FE_net_durn_agd.1.2 <- list.load(temp.list[[4]])
+## age sub-grouped IPD
+FE_ipd.3 <- list.load(temp.list[[3]])
 
-
-## result in study one
-re.list <- list(FE_net_durn, FE_net_durn_agd.1.1, FE_net_durn_agd.1.2)
+re.list <- list(FE_ipd.1, FE_ipd.2, FE_ipd.3)
 
 comb.list.durn <- extrac.list(re.list)
 
 ## draw the figures
 coeff.mod1.f.org <- do.call("bind_rows", comb.list.durn[[1]]) %>%
-  mutate(scenario = case_when(id %in% 1 ~ "gold standard scenario", 
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario")) %>%
+  mutate(scenario = case_when(id %in% c(1) ~ "Base scenario", 
+                              id %in% c(2) ~ "No sub-groups scenario",
+                              id %in% c(3) ~ "Sub-groups scenario")) %>%
   group_by(parameter, scenario) %>%
   summarise_at(c("mean", "lower", "upper"), mean) %>%
   mutate_if(is.numeric, round, digits = 3) %>%
   mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
          ## factorize the scenario
-         scenario = factor(scenario, levels = c("gold standard scenario", "sub-groups scenario", "no sub-groups scenario"))) %>%
+         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario"))) %>%
   arrange(parameter, scenario)
 
 ## forest figure
-study1_durn <- coe.forest.fig(paste(c('durnpso', '^d'),collapse="|"), -2.5, 4, -1.5, 0.6, coeff.mod1.f.org) +
-  labs(title = "Comparison of coefficient of model in study one")
+study1_durn <- coe.forest.fig(paste(c('durnpso', '^d'),collapse="|"), -3, 5.5, -2, 0.6, coeff.mod1.f.org) +
+  labs(title = "Comparison of coefficient of model")
 study1_durn
 
 # save(study1_durn, file = "study1_durn.RData")
 ```
 
-```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=FALSE}
+```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
 
 coeff.mod1.rel.org <- do.call("bind_rows", comb.list.durn[[5]]) %>%
-    mutate(scenario = case_when(id %in% c(1) ~ "gold standard scenario",
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario"),
+    mutate(scenario = case_when(id %in% c(1) ~ "Base scenario",
+                                id %in% c(2) ~ "No sub-groups scenario",
+                               id %in% c(3) ~ "Sub-groups scenario"),
            ## mutate the parameter to be the treatment group
           parameter = str_sub(sub(".*: ", "", parameter), -10, -2)) %>%
-  group_by(scenario, parameter) %>%
+  group_by(scenario, `.study`, parameter) %>%
+  filter(`.study` == "UNCOVER-2") %>%
   summarise_at(c("mean", "lower", "upper"), mean) %>%
   mutate_if(is.numeric, round, digits = 3) %>%
   mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
          ## factorize the scenario
-         scenario = factor(scenario, levels = c("gold standard scenario", "sub-groups scenario", "no sub-groups scenario"))) %>%
+         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario"))) %>%
   arrange(parameter, scenario)
 
 study1_rr <- coe.forest.fig(,-2, 4, -1, 0.5, coeff.mod1.rel.org) +
-  labs(title = "Comparison of population-adjusted relative treatment effects in study one")
+  labs(title = "Comparison of population-adjusted relative treatment effects") +
+  facet_wrap(~`.study`)
 study1_rr
 # save(study1_rr, file = "study1_rr.RData")
 
 ```
 
-## Study two (original data with low-information setting)
+## Duration of psoriasis
 
-```{r echo=FALSE, error=FALSE, fig.align='!c', fig.height=8, fig.pos="H", fig.show="hold", fig.width=8, message=FALSE, warning=FALSE, eval=FALSE}
+```{r echo=FALSE, error=FALSE, fig.align='!c', fig.height=8, fig.pos="H", fig.show="hold", fig.width=8, message=FALSE, warning=FALSE, eval=TRUE}
 ##################################################################
-############              study two ##############################
+############    duration of psoriasis ##############################
 ##################################################################
 
 ## study two
-FE_net_durn_agd.2.1 <- list.load(temp.list[[5]])
-FE_net_durn_agd.2.2 <- list.load(temp.list[[6]])
+FE_ipd.4 <- list.load(temp.list[[4]])
 
+## combine as a list
+re.list.2 <- list(FE_ipd.1, FE_ipd.2, FE_ipd.4)
 
-re.list.2 <- list(FE_net_durn, FE_net_durn_agd.2.1, FE_net_durn_agd.2.2)
-
+## Extract the model result from the combined list
 comb.list.durn.2 <- extrac.list(re.list.2)
 
 coeff.mod1.f.2 <- do.call("bind_rows", comb.list.durn.2[[1]]) %>%
-  mutate(scenario = case_when(id %in% 1 ~ "gold standard scenario", 
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario")) %>%
+  mutate(scenario = case_when(id %in% c(1) ~ "Base scenario", 
+                              id %in% c(2) ~ "No sub-groups scenario",
+                              id %in% c(3) ~ "Sub-groups scenario")) %>%
   mutate_if(is.numeric, round, digits = 3) %>%
   mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
          ## factorize the scenario
-         scenario = factor(scenario, levels = c("gold standard scenario", "sub-groups scenario", "no sub-groups scenario"))) %>%
+         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario"))) %>%
   arrange(parameter, scenario)
 
 ## duration of psoriasis
-study2_durn <- coe.forest.fig(paste(c('durnpso', '^d'),collapse="|"), -2, 4, -0.8, 0.6, coeff.mod1.f.2)+
+study2_durn <- coe.forest.fig(paste(c('durnpso', '^d'),collapse="|"), -2.5, 5, -1.5, 0.6, coeff.mod1.f.2)+
   labs(title = "Comparison of coefficients of duration of psoriasis in study two")
 study2_durn
 # save(study2_durn, file = "study2_durn.RData")
 ```
 
-```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=FALSE}
+```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
 
 coeff.mod.f.rel2 <- do.call("bind_rows", comb.list.durn.2[[5]]) %>%
-    mutate(scenario = case_when(id %in% c(1) ~ "gold standard scenario",
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario"),
+    mutate(scenario = case_when(id %in% c(1) ~ "Base scenario",
+                              id %in% c(2) ~ "No sub-groups scenario",
+                              id %in% c(3) ~ "Sub-groups scenario"),
            ## mutate the parameter
           parameter = str_sub(sub(".*: ", "", parameter), -10, -2)) %>%
-  group_by(scenario, parameter) %>%
+  group_by(scenario, `.study`, parameter) %>%
+  filter(`.study` == "UNCOVER-2") %>%
   summarise_at(c("mean", "lower", "upper"), mean) %>%
   mutate_if(is.numeric, round, digits = 3) %>%
-  mutate("Mean (95% CI)" = paste0(mean, " (", lower, ", ", upper, ")"))
+  mutate("Mean (95% CI)" = paste0(mean, " (", lower, ", ", upper, ")"),
+         ## factorize the scenario
+         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario")))
 
 study2_rr <- coe.forest.fig(,-2, 4, -1, 0.5, coeff.mod.f.rel2) +
-  labs(title = "Comparison of population-adjusted relative treatment effects in the UNCOVER-3")
+  labs(title = "Comparison of population-adjusted relative treatment effects") +
+  facet_wrap(~`.study`)
+
 study2_rr
 
 # save(study2_rr, file = "study2_rr.RData")
 
 ```
 
-## Study three (simulated data with low-information setting)
-
-```{r echo=FALSE, error=FALSE, fig.align='!c', fig.height=8, fig.pos="H", fig.show="hold", fig.width=8, message=FALSE, warning=FALSE}
-##################################################################
-############              study three ##############################
-##################################################################
-
-## study three
-FE_net_durn_agd.3.1 <- list.load(temp.list[[7]])
-FE_net_durn_agd.3.2 <- list.load(temp.list[[8]])
-
-
-re.list.3 <- list(FE_net_durn.2, FE_net_durn_agd.3.1, FE_net_durn_agd.3.2)
-
-comb.list.durn.3 <- extrac.list(re.list.3)
-
-coeff.mod1.f.3 <- do.call("bind_rows", comb.list.durn.3[[1]]) %>%
-  mutate(scenario = case_when(id %in% 1 ~ "gold standard scenario", 
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario")) %>%
-  mutate_if(is.numeric, round, digits = 3) %>%
-  mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
-         ## factorize the scenario
-         scenario = factor(scenario, levels = c("gold standard scenario", "sub-groups scenario", "no sub-groups scenario"))) %>%
-  arrange(parameter, scenario)
-
-## duration of psoriasis
-study3_durn <- coe.forest.fig(paste(c('durnpso', '^d'),collapse="|"), -3, 4.5, -2, 0.6, coeff.mod1.f.3)+
-  labs(title = "Comparison of coefficients of model in study three")
-study3_durn
-# save(study3_durn, file = "study3_durn.RData")
-```
-
-```{r, fig.height=20, fig.width=20, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE}
-
-coeff.mod.f.rel3 <- do.call("bind_rows", comb.list.durn.3[[5]]) %>%
-    mutate(scenario = case_when(id %in% c(1) ~ "gold standard scenario",
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario"),
-           ## mutate the parameter
-          parameter = str_sub(sub(".*: ", "", parameter), -10, -2)) %>%
-  # filter(`.study` == "UNCOVER-3") %>%
-  group_by(scenario, `.study`, parameter) %>%
-  summarise_at(c("mean", "lower", "upper"), mean) %>%
-  mutate_if(is.numeric, round, digits = 3) %>%
-  mutate("Mean (95% CI)" = paste0(mean, " (", lower, ", ", upper, ")"), scenario = factor(scenario, levels = c("gold standard scenario", "sub-groups scenario", "no sub-groups scenario"))) %>%
-  arrange(parameter, scenario)
-
-study3_rr <- coe.forest.fig(,-2, 5, -1, 0.6, coeff.mod.f.rel3, 1)  +
-  labs(title = "Comparison of population-adjusted relative treatment effects")+
-  facet_wrap(~`.study`)
-study3_rr
-# save(study3_rr, file = "study3_rr.RData")
-
-```
-
-## Study three (simulated data (higer interaction in the placebo group) with low-information setting)
-
-```{r echo=FALSE, error=FALSE, fig.align='!c', fig.height=8, fig.pos="H", fig.show="hold", fig.width=8, message=FALSE, warning=FALSE}
-temp.list.d <- path_durn("D:\\MPH-Project\\Further work\\model with higher interaction in plb group\\")
-
-FE_net_durn.2 <- list.load(temp.list.d[[1]])
-FE_net_durn_agd.3.1 <- list.load(temp.list.d[[2]])
-FE_net_durn_agd.3.2 <- list.load(temp.list.d[[3]])
-
-re.list.3 <- list(FE_net_durn.2, FE_net_durn_agd.3.1, FE_net_durn_agd.3.2)
-
-comb.list.durn.3 <- extrac.list(re.list.3)
-
-coeff.mod1.f.3 <- do.call("bind_rows", comb.list.durn.3[[1]]) %>%
-  mutate(scenario = case_when(id %in% 1 ~ "gold standard scenario", 
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario")) %>%
-  mutate_if(is.numeric, round, digits = 3) %>%
-  mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
-         ## factorize the scenario
-         scenario = factor(scenario, levels = c("gold standard scenario", "sub-groups scenario", "no sub-groups scenario"))) %>%
-  arrange(parameter, scenario)
-
-## duration of psoriasis
-study3_durn <- coe.forest.fig(paste(c('durnpso', '^d'),collapse="|"), -3, 4.5, -2, 0.6, coeff.mod1.f.3)+
-  labs(title = "Comparison of coefficients of model in study three")
-study3_durn
-
-```
-
-```{r, fig.height=20, fig.width=20, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE}
-
-coeff.mod.f.rel3 <- do.call("bind_rows", comb.list.durn.3[[5]]) %>%
-    mutate(scenario = case_when(id %in% c(1) ~ "gold standard scenario",
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario"),
-           ## mutate the parameter
-          parameter = str_sub(sub(".*: ", "", parameter), -10, -2)) %>%
-  # filter(`.study` == "UNCOVER-3") %>%
-  group_by(scenario, `.study`, parameter) %>%
-  summarise_at(c("mean", "lower", "upper"), mean) %>%
-  mutate_if(is.numeric, round, digits = 3) %>%
-  mutate("Mean (95% CI)" = paste0(mean, " (", lower, ", ", upper, ")"), scenario = factor(scenario, levels = c("gold standard scenario", "sub-groups scenario", "no sub-groups scenario"))) 
-# %>%
-#   arrange(parameter, scenario)
-
-study3_rr <- coe.forest.fig(,-2, 5, -1, 0.6, coeff.mod.f.rel3, 1)  +
-  labs(title = "Comparison of population-adjusted relative treatment effects") +
-  facet_wrap(~`.study`)
-study3_rr
-# save(study3_rr, file = "study3_rr.RData")
-
-```
-
-
-## Study three of Age (simulated data with low-information setting)
-
-```{r echo=FALSE, error=FALSE, fig.align='!c', fig.height=8, fig.pos="H", fig.show="hold", fig.width=8, message=FALSE, warning=FALSE, eval=FALSE}
-##################################################################
-############              study three ##############################
-##################################################################
-
-temp.list1 <- path_durn("D:\\MPH-Project\\")
-
-## study three
-FE_net_age_agd.2 <- list.load(temp.list1[[20]])
-FE_net_age_agd.4.3 <- list.load(temp.list1[[17]])
-FE_net_age_agd.4.4 <- list.load(temp.list1[[18]])
-
-re.list.age.3 <- list(FE_net_age_agd.2, FE_net_age_agd.4.3, FE_net_age_agd.4.4)
-
-comb.list.age.3 <- extrac.list(re.list.age.3)
-```
-
-```{r echo=FALSE, error=FALSE, fig.align='!c', fig.height=8, fig.pos="H", fig.show="hold", fig.width=8, message=FALSE, warning=FALSE, eval=FALSE}
-coeff.age.f.3 <- do.call("bind_rows", comb.list.age.3[[1]])%>%
-  mutate(scenario = case_when(id %in% c(1) ~ "gold standard scenario",
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario")) %>%
-  mutate_if(is.numeric, round, digits = 3) %>%
-  mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
-         scenario = factor(scenario, levels = c("gold standard scenario", "sub-groups scenario", "no sub-groups scenario"))) %>%
-  arrange(parameter, scenario)
-  
-
-## duration of psoriasis
-study3_age <- coe.forest.fig(paste(c('durnpso', '^d'),collapse="|"), -3, 5, -2, 0.6, coeff.age.f.3)+
-  labs(title = "Comparison of coefficient of model in study three")
-study3_age
-
-```
-
-```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=FALSE}
-
-coeff.age.rel.3 <- do.call("bind_rows", comb.list.age.3[[5]]) %>%
-  mutate(scenario = case_when(id %in% c(1) ~ "gold standard scenario",
-                              id %in% c(2) ~ "no sub-groups scenario",
-                              id %in% c(3) ~ "sub-groups scenario")) %>%
-  filter(`.study` == "UNCOVER-3") %>%
-   group_by(scenario, parameter) %>%
-  summarise_at(c("mean", "lower", "upper"), mean) %>%
-  mutate_if(is.numeric, round, digits = 3) %>%
-  mutate("Mean (95% CI)" = paste0(mean, " (", lower, ", ", upper, ")"), scenario = factor(scenario, levels = c("gold standard scenario", "sub-groups scenario", "no sub-groups scenario"))) %>%
-  arrange(parameter, scenario)
-
-study3_rrage <- coe.forest.fig(,-2, 5, -1, 0.6, coeff.age.rel.3, 1)  +
-  labs(title = "Comparison of relative treatment effect in the UNCOVER-3")
-study3_rrage
-
+```{r}
 ```
