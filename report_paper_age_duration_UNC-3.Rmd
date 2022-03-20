@@ -68,7 +68,6 @@ coe.forest.fig <- function(filter_1, x1, y1, x2, ypot, dt=coeff.mod.f, rfl=0, fa
     scale_x_continuous(limits = c(x1, y1)) + 
     scale_color_manual(values=color2) +
     ylab(" ") +
-    xlab("Value") +
     theme_bw() +
     theme(panel.border = element_blank(),
           axis.line = element_line(colour = "black"),
@@ -172,7 +171,8 @@ coeff.mod1.f.org <- do.call("bind_rows", comb.list.age[[1]]) %>%
 study1_age <- coe.forest.fig("age",
   # paste(c('durnpso', '^d'),collapse="|"), 
   -4, 2, -2.7, 0.6, coeff.mod1.f.org) +
-  labs(title = "Comparison of coefficient of model")
+  labs(title = "Comparison of coefficient of model") +              xlab("Value")
+
 study1_age
 
 # save(study1_durn, file = "study1_durn.RData")
@@ -198,7 +198,8 @@ coeff.mod1.rel.org <- do.call("bind_rows", comb.list.age[[5]]) %>%
   arrange(parameter, scenario)
 
 study1_rr <- coe.forest.fig(,-2, 4, -1, 0.5, coeff.mod1.rel.org) +
-  labs(title = "Comparison of population-adjusted relative treatment effects")
+  labs(title = "Comparison of population-adjusted relative treatment effects") +              
+  xlab("Probit difference")
 
 study1_rr
 # save(study1_rr, file = "study1_rr.RData")
@@ -235,7 +236,8 @@ coeff.mod1.f.2 <- do.call("bind_rows", comb.list.durn[[1]]) %>%
 study2_durn <- coe.forest.fig("durnpso",
   # paste(c('durnpso', '^d'),collapse="|"), 
   -4, 2, -2.7, 0.6, coeff.mod1.f.2)+
-  labs(title = "Comparison of coefficients of duration of psoriasis in study two")
+  labs(title = "Comparison of coefficients of duration of psoriasis in study two")+              
+  xlab("Value")
 study2_durn
 # save(study2_durn, file = "study2_durn.RData")
 ```
@@ -259,7 +261,8 @@ coeff.mod.f.rel2 <- do.call("bind_rows", comb.list.durn[[5]]) %>%
          scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario")))
 
 study2_rr <- coe.forest.fig(,-2, 4, -1, 0.5, coeff.mod.f.rel2) +
-  labs(title = "Comparison of population-adjusted relative treatment effects")
+  labs(title = "Comparison of population-adjusted relative treatment effects")+              
+  xlab("Probit difference")
 
 study2_rr
 
