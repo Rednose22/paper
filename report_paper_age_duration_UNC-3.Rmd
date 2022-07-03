@@ -44,8 +44,8 @@ mean.comp <- mean(!full_ipd$complete)
 # remove the missing data
 full_ipd <- filter(full_ipd, complete) %>%
   mutate(cat_pasi = ifelse(pasi75 == 1, "yes", "no"),
-         sub_age = ifelse(age>=46, "gt or eq 46", "lt 46"),
-         durncat = ifelse(durnpso < 17, "lt 17", "ge 17"))
+         sub_age = ifelse(age>=46, ">= 46", "< 46"),
+         durncat = ifelse(durnpso < 17, "< 17", ">= 17"))
 
 full_agd <- plaque_psoriasis_agd
 
@@ -145,7 +145,7 @@ FE_ipd.2 <- list.load(temp.list[[2]])
 
 # Age
 
-```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
+```{r eval=TRUE, echo=FALSE, error=FALSE, fig.align='!c', fig.height=8, fig.pos="H", fig.show="hold", fig.width=8, message=FALSE, warning=FALSE}
 
 ## age sub-grouped IPD
 FE_ipd.3 <- list.load(temp.list[[3]])
@@ -157,25 +157,29 @@ comb.list.age <- extrac.list(re.list)
 ## draw the figures
 coeff.mod1.f.org <- do.call("bind_rows", comb.list.age[[1]]) %>%
   mutate(scenario = case_when(id %in% c(1) ~ "Base scenario", 
-                              id %in% c(2) ~ "No sub-groups scenario",
-                              id %in% c(3) ~ "Sub-groups scenario")) %>%
+                              id %in% c(2) ~ "Aggregate scenario",
+                              id %in% c(3) ~ "Subgroup scenario")) %>%
   group_by(parameter, scenario) %>%
   summarise_at(c("mean", "lower", "upper"), mean) %>%
   mutate_if(is.numeric, round, digits = 3) %>%
   mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
          ## factorize the scenario
-         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario"))) %>%
+         scenario = factor(scenario, levels = c("Base scenario", "Subgroup scenario", "Aggregate scenario"))) %>%
   arrange(parameter, scenario)
 
 ## forest figure
 study1_age <- coe.forest.fig("age",
   # paste(c('durnpso', '^d'),collapse="|"), 
   -4, 2, -2.7, 0.6, coeff.mod1.f.org) +
-  labs(title = "Comparison of coefficient of model") +              xlab("Value")
+  # labs(title = "Coefficients of treatment-covariate interactions - age as subgroup effect") +
+  labs(title = "Age")+
+  xlab("Value") +
+  theme(axis.text.y = element_text(angle=90, hjust=0.5))
 
 study1_age
 
-# save(study1_durn, file = "study1_durn.RData")
+save(study1_age, file = "study1_age.RData")
+
 ```
 
 ## Age
@@ -184,8 +188,8 @@ study1_age
 
 coeff.mod1.rel.org <- do.call("bind_rows", comb.list.age[[5]]) %>%
     mutate(scenario = case_when(id %in% c(1) ~ "Base scenario",
-                                id %in% c(2) ~ "No sub-groups scenario",
-                               id %in% c(3) ~ "Sub-groups scenario"),
+                                id %in% c(2) ~ "Aggregate scenario",
+                               id %in% c(3) ~ "Subgroup scenario"),
            ## mutate the parameter to be the treatment group
           parameter = str_sub(sub(".*: ", "", parameter), -10, -2)) %>%
   group_by(scenario, `.study`, parameter) %>%
@@ -194,15 +198,17 @@ coeff.mod1.rel.org <- do.call("bind_rows", comb.list.age[[5]]) %>%
   mutate_if(is.numeric, round, digits = 3) %>%
   mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
          ## factorize the scenario
-         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario"))) %>%
+         scenario = factor(scenario, levels = c("Base scenario", "Subgroup scenario", "Aggregate scenario"))) %>%
   arrange(parameter, scenario)
 
 study1_rr <- coe.forest.fig(,-2, 4, -1, 0.5, coeff.mod1.rel.org) +
-  labs(title = "Comparison of population-adjusted relative treatment effects") +              
-  xlab("Probit difference")
+  # labs(title = "Population-adjusted relative treatment effects - age as subgroup effect") +
+  labs(title = "Age")+
+  xlab("Probit difference") +
+  theme(axis.text.y = element_text(angle=90, hjust=0.5))
 
 study1_rr
-# save(study1_rr, file = "study1_rr.RData")
+save(study1_rr, file = "study1_rr.RData")
 
 ```
 
@@ -224,22 +230,25 @@ comb.list.durn <- extrac.list(re.list.2)
 
 coeff.mod1.f.2 <- do.call("bind_rows", comb.list.durn[[1]]) %>%
   mutate(scenario = case_when(id %in% c(1) ~ "Base scenario", 
-                              id %in% c(2) ~ "No sub-groups scenario",
-                              id %in% c(3) ~ "Sub-groups scenario")) %>%
+                              id %in% c(2) ~ "Aggregate scenario",
+                              id %in% c(3) ~ "Subgroup scenario")) %>%
   mutate_if(is.numeric, round, digits = 3) %>%
   mutate("Mean (95% CI)" = paste0(mean, "(", lower, ", ", upper, ")"),
          ## factorize the scenario
-         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario"))) %>%
+         scenario = factor(scenario, levels = c("Base scenario", "Subgroup scenario", "Aggregate scenario"))) %>%
   arrange(parameter, scenario)
 
 ## duration of psoriasis
 study2_durn <- coe.forest.fig("durnpso",
   # paste(c('durnpso', '^d'),collapse="|"), 
   -4, 2, -2.7, 0.6, coeff.mod1.f.2)+
-  labs(title = "Comparison of coefficients of duration of psoriasis in study two")+              
-  xlab("Value")
+  # labs(title = "coefficients of treatment-covariate interactions - duration of psoriasis as subgroup effect")+
+  labs(title = "Duration of psoriasis")+
+  xlab("Value") +
+  theme(axis.text.y = element_text(angle=90, hjust=0.5))
+
 study2_durn
-# save(study2_durn, file = "study2_durn.RData")
+save(study2_durn, file = "study2_durn.RData")
 ```
 
 ## Duration of psoriasis
@@ -248,8 +257,8 @@ study2_durn
 
 coeff.mod.f.rel2 <- do.call("bind_rows", comb.list.durn[[5]]) %>%
     mutate(scenario = case_when(id %in% c(1) ~ "Base scenario",
-                              id %in% c(2) ~ "No sub-groups scenario",
-                              id %in% c(3) ~ "Sub-groups scenario"),
+                              id %in% c(2) ~ "Aggregate scenario",
+                              id %in% c(3) ~ "Subgroup scenario"),
            ## mutate the parameter
           parameter = str_sub(sub(".*: ", "", parameter), -10, -2)) %>%
   group_by(scenario, `.study`, parameter) %>%
@@ -258,19 +267,67 @@ coeff.mod.f.rel2 <- do.call("bind_rows", comb.list.durn[[5]]) %>%
   mutate_if(is.numeric, round, digits = 3) %>%
   mutate("Mean (95% CI)" = paste0(mean, " (", lower, ", ", upper, ")"),
          ## factorize the scenario
-         scenario = factor(scenario, levels = c("Base scenario", "Sub-groups scenario", "No sub-groups scenario")))
+         scenario = factor(scenario, levels = c("Base scenario", "Subgroup scenario", "Aggregate scenario")))
 
 study2_rr <- coe.forest.fig(,-2, 4, -1, 0.5, coeff.mod.f.rel2) +
-  labs(title = "Comparison of population-adjusted relative treatment effects")+              
-  xlab("Probit difference")
+    # labs(title = "Population-adjusted relative treatment effects - duration of psoriasis as subgroup effect")+
+  labs(title = "Duration of psoriasis")+
+  xlab("Probit difference") +
+  theme(axis.text.y = element_text(angle=90, hjust=0.5))
 
 study2_rr
 
-# save(study2_rr, file = "study2_rr.RData")
+save(study2_rr, file = "study2_rr.RData")
 
 # plot(FE_ipd.2[["network"]], weight_nodes = TRUE, weight_edges = TRUE, show_trt_class = TRUE) + 
 #   ggplot2::theme(legend.position = "bottom", legend.box = "vertical")
 
+
+```
+
+## Combine the figures together
+## population-adjusted relative treatment effects
+```{r, fig.height=8, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", message=FALSE, error=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
+
+library(ggplot2)
+library(grid)
+library(gridExtra)
+library(dplyr)
+library(ggpubr)
+library(egg)
+
+load("study1_age.RData")
+load("study1_rr.RData")
+load("study2_durn.RData")
+load("study2_rr.RData")
+
+
+plot_coef <- ggarrange(
+study1_age+theme(legend.position='bottom', text = element_text(size=15), axis.ticks.y = element_blank()), 
+study2_durn+theme(legend.position='bottom', text = element_text(size=15),
+                 axis.text.y = element_blank(),
+                 axis.ticks.y = element_blank(),
+                 axis.title.y = element_blank()),
+                 nrow=1, ncol = 2,
+                 common.legend = TRUE, legend = "bottom")
+
+save(plot_coef, file = "plot_coef.RData")
+
+# annotate_figure(plot_coef, top = text_grob("coefficients of treatment-covariate interactions", size = 15))
+
+plot_rr <- ggarrange(
+study1_rr+theme(legend.position='bottom', text = element_text(size=15), axis.ticks.y = element_blank()),
+study2_rr+theme(legend.position='hidden', text = element_text(size=15), 
+                 axis.text.y = element_blank(),
+                 axis.ticks.y = element_blank(),
+                 axis.title.y = element_blank(),
+                 axis.line.y = element_blank()),
+                 nrow=1, ncol = 2,
+                 common.legend = TRUE, legend = "bottom")
+
+save(plot_rr, file = "plot_rr.RData")
+
+# annotate_figure(plot_rr, top = text_grob("Population-adjusted relative treatment effects", size = 15))
 
 ```
 
