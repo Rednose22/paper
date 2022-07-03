@@ -1,5 +1,5 @@
 ---
-geometry: "left=1cm,right=1cm,top=2.5cm,bottom=2.5cm"
+geometry: "left=0.5cm,right=0.5cm,top=2.5cm,bottom=2.5cm"
 output:
   bookdown::pdf_document2:
     latex_engine: lualatex
@@ -9,116 +9,90 @@ header-includes:
 fontsize: 11pt
 mainfont: Arial
 linestretch: 1.5
-bibliography: reference.bib
-csl: vancouver-superscript.csl
-keep_tex: yes
+# bibliography: reference.bib
+# csl: vancouver-superscript.csl
+# keep_tex: yes
 ---
 
 #	Introduction
 
 Individual patient data (IPD) has been well acknowledged by different stakeholders as the most informative one to conduct quantitative research (xxx). Especially with the prevalence of meta-analysis in various disciplines, IPD meta-analysis has become the gold standard methodology in the evidence synthesis of evidence-based medicine. However, aggregate-level data was the most common evidence published in the journal. Thus, a range of published methods were intended to combine IPD and aggregate-level data into the meta-analysis to address the lack of evidence. Recently, Phillippo et al. developed multilevel network meta-analysis (ML-NMR) to extend the standard network meta-analysis (NMA) and demonstrated several key advantages compared to two prevalent methodologies: matching-adjusted indirect comparison (MAIC) and simulated treatment comparison (STC). 
 
-However, except the common aggregate-level data, subgroup results were also frequently published in the report of clinical trial to show the heterogeneity of treatment effect regarding to various stratification such as baseline characteristics and genetic information. Although pitfalls of subgroup results have been criticized substantially by a number of published papers as low power, risk of overfitting and increased false-positive error (xxx), in principle, a potentially useful information could still be acquired in the subgroup analyses under well-planned and executed study design (xxx).  Thus, this motivated us to investigate the feasibility of including the subgroup results in the meta-analysis.
+However, except the common aggregate-level data, subgroup-level data were also frequently published in the report of clinical trial to show the heterogeneity of treatment effect regarding to various stratification such as baseline characteristics and genetic information. Although pitfalls of subgroup analyses have been criticized substantially by a number of published papers as low power, risk of overfitting and increased false-positive error (xxx), in principle, a potentially useful information could still be acquired in the subgroup analyses under well-planned and executed study design (xxx).  Thus, this motivated us to investigate the feasibility of including the subgroup-level data in the meta-analysis.
 
-Given the complexity of correlation between multiple subgroup effects, only single subgroup effect could be incorporated into current ML-NMR framework using existing R package MULTINMA. Therefore, here, we carry out a simulation study in a tutorial manner to elaborate how to combine the subgroup results with IPD and aggregate data in the network meta-analysis and show the additional benefits of subgroup results in the evidence synthesis. To confirm the consistency of model results, we ran two simulations by selecting age and duration of psoriasis as two subgroup effects and then compare the model results to assess if the model result could be coherent.
+Given the complexity of correlation between multiple subgroup effects, only single subgroup effect could be incorporated into current ML-NMR framework using existing R package MULTINMA. Therefore, here, we carry out a simulation study in a tutorial manner to elaborate how to combine the subgroup-level data with IPD and aggregate data in the network meta-analysis and show the additional benefits of subgroup-level data in the evidence synthesis. To confirm the consistency of model results, we ran two simulations by selecting age and duration of psoriasis as two subgroup effects and then compare the model results to assess if the model result could be coherent.
 
-#	Methods (700-800)
+#	Methods
 
-We extended the ML-NMR proposed by Phillippo et al. in this study to incorporate the subgroup results in the network meta-analysis. Specifically, there are two procedures in the modelling process. First, we needed to define a IPD model with prespecified covariates. Second, the aggregate data could be combined with IPD model as an integration of the IPD model over the covariate distributions. Thereby, the bias and uncertainty could be reduced compared to the aggregate data only meta-analysis and IPD only meta-analysis (xxx). We aimed to assess whether the integration of single subgroup results with IPD and aggregate data in the network meta-analysis could provide a more precise estimation of treatment-covariate interaction and population-adjusted relative treatment effect.
+We extended the ML-NMR proposed by Phillippo et al. in this study to incorporate the subgroup-level data in the network meta-analysis. Specifically, a fixed-effect ML-NMR was built up with two procedures. First, we needed to define a IPD model with prespecified covariates. Second, the aggregate data could be combined with IPD model as an integration of the IPD model over the covariate distributions. Thereby, the bias and uncertainty could be reduced compared to the aggregate data only meta-analysis and IPD only meta-analysis (xxx). We aimed to assess whether the integration of single subgroup-level data with IPD and aggregate data in the network meta-analysis could provide a more precise estimation of treatment-covariate interaction and population-adjusted relative treatment effect.
 
 ## Data
-The IPD released in the R package Multinma was applied in this study, which contained 4 IPD studies IXORA-S ( Ixekizumab q2w versus Ustekinumab), UNCOVER-1 (80 mg Ixekizumab q2w versus 160 mg Ixekizumab
-q2w versus 80 mg Ixekizumab q4w), UNCOVER-2 (80 mg Ixekizumab q2w versus 160 mg Ixekizumab
-q2w versus 80 mg Ixekizumab q4w versus 50 mg Etanercept), and UNCOVER-3 ( 80 mg Ixekizumab q2w versus 160 mg Ixekizumab q2w versus 80 mg Ixekizumab q4w versus 50 mg Etanercept) (xxx). All of them were extracted from IPD of phase III clinical trial targeting to the plaque psoriasis. The network of treatments was shown in the Figure xxx, presenting the treatment class and sample size of each treatment.
 
-```{r fig1, fig.cap = " Network of treatments in IPD", fig.height=5, fig.width=8, fig.pos = "H", fig.align='!c', fig.show="hold", error=FALSE, warning=FALSE, echo=FALSE, message=FALSE}
+The IPD released in the R package Multinma was applied in this study, which contained 4 IPD studies IXORA-S ( Ixekizumab q2w versus Ustekinumab), UNCOVER-1 (80 mg Ixekizumab q2w versus 160 mg Ixekizumab versus q2w versus 80 mg Ixekizumab q4w), UNCOVER-2 (80 mg Ixekizumab q2w versus 160 mg Ixekizumab q2w versus 80 mg Ixekizumab q4w versus 50 mg Etanercept), and UNCOVER-3 ( 80 mg Ixekizumab q2w versus 160 mg Ixekizumab q2w versus 80 mg Ixekizumab q4w versus 50 mg Etanercept) (xxx). All of them were extracted from IPD of phase III clinical trial targeting to the plaque psoriasis. The network of treatments was shown in the Figure \@ref(fig:fig1), with legend of the treatment class and sample size of each treatment.
+
+```{r, error=FALSE, warning=FALSE, echo=FALSE, message=FALSE, include=FALSE}
 library(multinma)
-require(dplyr)
+library(tidyverse)
+library(lazyeval)
+library(data.table)
+library(kableExtra)
+library(rlist) ## save the list as rdata
+library(qdapRegex)
+library(gridExtra)
+library(lemon)
 
+options(mc.cores = parallel::detectCores())
+
+nc <- switch(tolower(Sys.getenv("_R_CHECK_LIMIT_CORES_")), 
+             "true" =, "warn" = 2, 
+             parallel::detectCores())
+options(mc.cores = nc)
+
+setwd("D:\\MPH-Project\\Further work\\paper")
+memory.limit(size=40000) # set memory
+
+#####################################################################
+##          Redistribute the outcome to increase                   ##
+##          treatment effects in  population                ##  
+#####################################################################
+
+## checking the missing data
 full_ipd <- plaque_psoriasis_ipd %>%
   mutate(   # Check complete cases for covariates of interest
-  complete = complete.cases(durnpso, prevsys, bsa, weight, psa, age, male),
-  # Treatment classes
+    complete = complete.cases(durnpso, prevsys, bsa, weight, psa, age, male))
+
+# remove the missing data
+full_ipd <- filter(full_ipd, complete) %>%
+  mutate(cat_pasi = ifelse(pasi75 == 1, "yes", "no"),
+         sub_age = ifelse(age >= 46, ">= 46", "< 46"),
+         sub_durn = ifelse(durnpso < 17, "< 17", ">= 17"))
+
+full_age <- plaque_psoriasis_agd
+#####################################################################
+##                          Data preparation                       ##
+#####################################################################
+
+set.seed(1234)
+## Data transformation in IPD
+sub_ipd <- full_ipd %>% 
+  mutate(# Variable transformations
+    bsa = bsa / 100,
+    prevsys = as.numeric(prevsys),
+    psa = as.numeric(psa),
+    weight = weight / 10,
+    age = age / 10,
+    durnpso = durnpso / 10,
+    # Treatment classes
     trtclass = case_when(trtn == 1 ~ "Placebo",
                          trtn %in% c(2, 3, 5, 6, 7) ~ "IL blocker",
-                         trtn == 4 ~ "TNFa blocker")) %>%
-  filter(complete)
+                         trtn == 4 ~ "TNFa blocker"))
 
-net_org <- combine_network(
-        set_ipd(full_ipd,
-            study = studyc, 
-            trt = trtc, 
-            r = pasi75,
-            trt_class = trtclass, 
-            trt_ref = "PBO")
-)
+## subgroup result generated from IPD
+## five covariate durnpso, prevsys, bsa, weight, psa, age
+## include studyc, trt, trtclass, trtn, trtc_long into by vars
 
-plot(net_org, weight_nodes = T, weight_edges = T, show_trt_class = T) +
-    ggplot2::theme(legend.position = "bottom", legend.box = "vertical")
-
-```
-
-### Scenario
-
-Based on the original data, we will also generate subgroup results and aggregate data from one of the IPD. Thus, three scenarios of data were designed in this study. Base scenario was all IPD; second scenario was three IPD and one subgroup result modified from one IPD; third scenario was three IPD and one aggregate data modified from one IPD.
-
-To create the data under three scenarios, age and duration of psoriasis were considered as two stratified factors to generate post-hoc subgroup results and aggregate data. Also, regarding to the the maximal availability of data, the subgroup results were generated by the IPD from UNCOVER-3. Generally, aggregate data is the summary information of treatment-level by studies and subgroup results is the summary information based on treatment and subgroup effect of each study. 
-
-## Analysis
-
-From the vignettes of R package MULTINMA, we chose PASI75 as outcome variables, which means if the percentage of change of PASI from baseline is greater than 75%, then PASI 75 was coded as 1 otherwise 0. Besides, multiple covariates were selected in the model, including duration of psoriasis, previous systematic disease (TRUE/FALSE), body surface area (BSA), weight, and psoriatic arthritis status (TRUE/FALSE). For the model selection, to maintain comparability with earlier analyses, a probit link was utilised (xxx) since PASI75 is a binary outcome. The individual level and aggregate level model notation (xxx) were shown as follows.
-\
-**Individual level model:**  
-\begin{align*}
-y_{ijk} \sim& \pi_{Ind}(\theta_{ijk}),\\
-g(\theta_{ijk}) =& \eta_{jk}(x_{ijk})) = \mu_j + x_{ijk}^T\beta + \gamma_k;
-\end{align*}
-\
-**Aggregate level model:**  
-\begin{align*}
-y_{.jk} \sim& \pi_{Agg}(\theta_{.jk}),\\
-\theta_{\cdot jk} =& \int_{\mathfrak{X}} g^{-1}\{\eta_{jk}(x)\}f_{jk}(x)dx;
-\end{align*}
-
-The configurations of models above were as specified:  
-\
-**Individual level model:**  
-1. $y_{ijk}$ and $X_{ijk}$ are the responses and covariates of patients i for treatment k in study j;  
-2. $\pi_{Ind}$ is the likelihood distribution of individual level model; $\theta_{\cdot jk}$ is the conditional average outcome of patients I of treatment k in study j;  
-3. g(*) is the link function of individual model;  
-4. $\eta_{jk}(x_{ijk})$ is the linear predictor of $X_{ijk}$; $\mu_j$ is the baseline results of study j; $x_{ijk}^T$ is algebra expression to represent the transposed $X_{ijk}$, $\beta$ are the coefficients matrix of covariates;  
-5. $\gamma_k$ is the effect of treatment k compared to the referenced treatment.    
-\
-**Aggregate level model:**  
-1. $\pi_{Agg}$ is the likelihood distribution of individual level model; $\theta_{\cdot jk}$ is the marginal average outcome of treatment k in study j;   
-2. $y_{.jk}$ is the outcome of aggregate model;  
-3. $\mathfrak{X}$ is the support of X; $f_{jk}(x)$ is the function of covariates of treatment k in study j;  
-4. $g^{-1}\{\eta_{jk}(x)\}$ is the inverse function of linear predictor.  
-\
-The individual level model could be explicitly regarded as a generalized linear model based on IPD. Whereas the aggregate level model was derived in an intuitive way. Based on the probability theory, the marginal probability of $X$ is calculated by assessing the conditional likelihood of $X$ given a specific value of $Y$ and then averaging this conditional probability over the whole distribution of Y. The equation is as follows:  
-\begin{align*}
-p_X(x) = \int_{x}p_{X|Y}(x|y)p_{Y}(y)dy
-\end{align*}
-\
-
-After generating subgroup results and aggregate data from IPD of study UNCOVER-3, three ML-NMR were generated for subgroup effect of age and duration of psoriasis respectively. Usually, the aggregate data would be covariates information summarized by treatment. Likewise, subgroup data, we reconstructed the IPD by summarizing the covariates information by treatment, potential effect modifier. Here, age and duration of psoriasis were treated as effect modifiers. After creation of subgroup data and aggregate data from IPD, we combine them together. A sample of subgroup data and aggregate data were presented in the Table xx and xx.
-
-```{r tb1 }
-
-
-```
-
-```{r tb2 }
-
-
-
-```
-
-
-Compared to the standard ML-NMR in the MULTINMA package, the most difference what we did in this study is we defined a function as shown below to simulate the subgroup results and aggregate data from existed IPD and then combined with the original aggregate data. Such that the subgroup results could be incorporated with IPD in the aggregate level.
-
-```{r, warning=FALSE, message=FALSE, error=FALSE, include=FALSE}
 sub_eff_func <- function(group_vars, name_) {
+  
   sub_ipd %>% 
     group_by(!!!group_vars) %>%
     summarise(age_mean = mean(age),
@@ -140,6 +114,58 @@ sub_eff_func <- function(group_vars, name_) {
               male = mean(male),
               bsa_mean = mean(bsa), 
               bsa_sd = sd(bsa)) %>%
+    mutate(studyc = paste(studyc, name_)) 
+  
+}
+
+## convert IPD to AgD
+ipd_agd <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long), "IPD")
+
+## convert IPD to duration-specific subgroup IPD
+agd_sub_durn <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long, sub_durn), "SUB")
+
+## convert IPD to age-specific subgroup IPD
+agd_sub_age <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long, sub_age), "SUB")
+
+## create the network of IPD
+
+net_org <- combine_network(
+        set_ipd(sub_ipd,
+            study = studyc, 
+            trt = trtc, 
+            r = pasi75,
+            trt_class = trtclass, 
+            trt_ref = "PBO")
+)
+```
+```{r fig1, fig.cap = " Network of treatments in IPD", fig.height=5, fig.width=6, fig.pos = "H", fig.align='center', fig.show="Hold", error=FALSE, warning=FALSE, echo=FALSE, message=FALSE}
+plot(net_org, weight_nodes = T, weight_edges = T, show_trt_class = T) +
+    ggplot2::theme(legend.position = "bottom", legend.box = "vertical")
+
+```
+
+## Scenario
+
+Based on the original data, three scenarios were designed. The base scenario was including four IPD in the individual-level model which is equivalent to the IPD network meta-analysis. For another two scenarios, we would only include one IPD in the individual-level model. For other three IPD, they need to be transformed to the subgroup-level data and aggregate data. Thus in the subgroup scenario, subgroup-level data was applied in the aggregate-level model while in the aggregate scenario, the aggregate data was applied in the aggregate-level model. considering the the maximal utility of data, the IPD from UNCOVER-3 with the largest sample size was applied in the individual-level model for subgroup scenario and aggregate scenario. To create the subgroup-level data, age and duration of psoriasis were considered as two stratified factors. Generally, aggregate data is the summary information of treatment-level by study and subgroup-level data is the summary information by study, treatment and level of subgroup effects. 
+
+The R code to generate subgroup-level data and aggregate data from existed IPD was also shown as below. Compared to the standard ML-NMR, the different point of what we did in this study was we built up the aggregate-level model not only based on aggregate but also subgroup-level data Such that with the flexibility of ML-NMR, the subgroup-level data could be incorporated with IPD. In this R function, we defined two parameters: first is a selection of variables that we used to group the data such as study ID and treatment; second is used to add a suffix in the study ID to differentiate with other study ID. Caution should be applied that the variable format and data structure in the subgroup-level data and aggregate data should be kept consistent with the IPD. 
+
+```{r, echo=TRUE, eval=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=200), tidy='styler'}
+sub_eff_func <- function(group_vars, name_) {
+  sub_ipd %>% 
+    group_by(!!!group_vars) %>%
+    summarise(age_mean = mean(age, na.rm = TRUE),
+              age_sd = sd(age, na.rm = TRUE),
+              weight_mean = mean(bmi, na.rm = TRUE),
+              weight_sd = sd(bmi, na.rm = TRUE),
+              durnpso_mean = mean(durnpso, na.rm = TRUE),
+              durnpso_sd = sd(durnpso, na.rm = TRUE),
+              pasi75_n = n(),
+              pasi75_r = sum(pasi75),
+              psa = mean(psa, na.rm = TRUE), 
+              prevsys = mean(prevsys, na.rm = TRUE),
+              bsa_mean = mean(bsa, na.rm = TRUE), 
+              bsa_sd = sd(bsa, na.rm = TRUE)) %>%
     mutate(studyc = paste(studyc, name_))
 }
 
@@ -153,36 +179,134 @@ agd_sub_durn <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long, sub_d
 agd_sub_durn <- sub_eff_func(quos(studyc, trtc, trtclass, trtn, trtc_long, sub_age), "SUB")
 
 ## combine original aggregate data with derived aggregate data and subgroup results
-sub_agd1 <- bind_rows(sub_agd,
-                      agd_sub_durn,
+sub_agd1 <- bind_rows(agd_sub_durn,
                       agd_sub_age,
                       ipd_agd)
 
 ```
 
-#	Results (700-800)
+After generating subgroup-level data and aggregate data from IPD of study UNCOVER-3, three ML-NMR were generated for subgroup effect of age and duration of psoriasis respectively. Usually, the aggregate data would be covariates information summarized by study and treatment. Likewise, subgroup data, we reconstructed the IPD by summarizing the covariates information by study, treatment, and potential effect modifiers. Here, age and duration of psoriasis were treated as subgroup modifiers. We set the median of age (46) as cutoff point to divide the population into two subpopulations: ">= 46 years" and "< 46 years". Same algorithm was applied in the duration of psoriasis such that whole population was separated as ">= 17 years" and "< 17 years" subpopulations. The sample of subgroup data and aggregate data were shown in the Table \@ref(tab:tb1) and \@ref(tab:tb2) We could find that subgroup data was presented as one record per study per treatment group per subgroup level. While aggregate-level data was one record per study per treatment group.
 
-## Findings for interactions
+```{r tb1, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+head(agd_sub_age, 10) %>% ungroup() %>%
+  select(studyc, trtc, sub_age, age_mean, age_sd, bsa_mean, bsa_sd, psa, prevsys, weight_mean, weight_sd, durnpso_mean, durnpso_sd) %>% mutate_if(is.numeric, round, digits = 2) %>%
+      kable(booktabs = TRUE, align = "l",
+      caption = 'Data structure of subgroup-level data') %>%
+      column_spec(1, bold = T) %>%
+      kable_styling(latex_options = c("striped", "HOLD_position"), full_width = T, font_size = 8) %>%
+      column_spec(10, width = "1.3cm") %>%
+      column_spec(11, width = "1cm") %>%
+      column_spec(12, width = "1.5cm") %>%
+      column_spec(13, width = "1.5cm")
+```
 
-Figure xxx showed the estimations of treatment-covariate interactions in three scenarios. Unequivocally, the estimation of interaction in the base scenario (e.g. age-TNFa block estimation: -0.269 (95%CI: -0.418, -0.12)) was the most precise compared with other two scnearios, followed by the subgroup scenario (e.g. age-TNFa block estimation: -0.388 (95%CI: -0.58, -0.212)) and then aggregare scenario (e.g. age-TNFa block estimation: -0.425 (95%CI: -0.696, -0.162)). This result also echoed the argument that IPD meta-analysis is the gold standatd of evidence synthesis (xxx). Notably, it is evident that differences of estimations existed between these three scenarios, which were reflected in the narrower interval of coefficients of covariates, covariate-treatment interactions in the subgroup set compared to the aggregate set. Furthermore, the estimations in the subgroup scenario were much closer to the base case than aggregate scenario.
+```{r tb2, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+head(ipd_agd, 10) %>% ungroup() %>%
+  select(studyc, trtc, age_mean, age_sd, bsa_mean, bsa_sd, psa, prevsys, weight_mean, weight_sd, durnpso_mean, durnpso_sd) %>% mutate_if(is.numeric, round, digits = 2) %>%
+      kable(booktabs = TRUE, align = "l",
+      caption = 'Data structure of aggregate-level data') %>%
+      column_spec(1, bold = T) %>%
+      kable_styling(latex_options = c("striped", "HOLD_position"), full_width = T, font_size = 8) %>%
+      column_spec(10, width = "1.3cm") %>%
+      column_spec(11, width = "1cm") %>%
+      column_spec(12, width = "1.5cm") %>%
+      column_spec(13, width = "1.5cm")
 
-To confirm the consistency of result generated by this extended approach, we conducted same simulation choosing DoR as subgroup effect. The forest plot of treatment-covariate interactions was shown in Figure xx. Generally, the results are similar to the simulation with age. The precision of estimation in the base scenario is the most accurate. Compared with the aggregate scenario, the estimation in the subgroup scenario was more precise and closer to the estimations in the base scenario.
+```
 
-## Comparison of population-adjusted relative treatment effect
-Regarding to the population-adjusted relative treatment effect compared to the placebo treatment, Figure xxx illustrated these based on the subject characteristics of UNCOVER-3 study. On the one hand, compared to the results of covariate-treatment interaction, the differences of estimations from three scenarios were relatively less differential though the estimations from base case was always the most accurate and stable. On another hand, the precision of estimations from subgroup scenario was slightly better than aggregate scenario. Specifically, for treatment IXE_Q4W, the range differences of 95% CI in the subgroup scenario (age: 2.262-2.923) and no subgroup scenario (2.3-3.038) were relatively visible. Thus, it showed that the impact of subgroup results on the calibration of relative treatment effects might not be so strong but still could be differentiated. Respecting the simulation of DoR, although we could still detect the difference between three scenarios, the differences between subgroup scenario and aggregate scenario were not much obvious as Figure xx shown.
 
-#	Discussion (900-1000)
-In this study, we proposed the extension of the ML-NMR accommodating the subgroup results in the existing ML-NMR framework and showed the whole process step by step. In the base scenario, the value of IPD was confirmed again. With the additional advantages of ML-NMR (xxx), this case study has affirmed that the input of subgroup level data could provide a more precise estimates of treatment effect and covariate-treatment interaction compared to the conventional aggregate level meta-analysis. Thus, apart from inherent advantages of ML-NMR method (xxx), the key advantage of this extension is to combine all available information considering the limited availability of clinical trial data. 
+## Analysis
 
-However, the limitations of this extension could not be neglected. With regard to the effect size of estimation, the difference between subgroup and aggregate scenario was not evident. Since there is only single subgroup factor was applied in this simulation, this simulation study could be extended to examine more subgroup factors. When multiple subgroup effects are considered, the subgroup results could be reported factorially (e.g. age and sex: younger and female; younger and male; older and female, older and male) then we need to consider whether subgroup results were correlated(xxx). 
+Once the data was prepared, the ML-NMR could be built. From the vignettes of R package MULTINMA, we chose PASI75 as outcome variables, which means if the percentage of change of PASI from baseline is greater than 75%, then PASI 75 was coded as 1 otherwise 0. Besides, multiple covariates were selected in the model, including duration of psoriasis, previous systematic disease (TRUE/FALSE), body surface area (BSA), weight, and psoriatic arthritis status (TRUE/FALSE).To maintain comparability with earlier analyses, a probit link was utilised to generate a fixed effect ML-NMR. The individual-level and aggregate-level model notation (xxx) were shown as follows.
+\
+**individual-level model:**  
+\begin{align*}
+y_{ijk} \sim& \pi_{Ind}(\theta_{ijk}),\\
+g(\theta_{ijk}) =& \eta_{jk}(x_{ijk})) = \mu_j + x_{ijk}^T\beta + \gamma_k;
+\end{align*}
+\
+**aggregate-level model:**  
+\begin{align*}
+y_{.jk} \sim& \pi_{Agg}(\theta_{.jk}),\\
+\theta_{\cdot jk} =& \int_{\mathfrak{X}} g^{-1}\{\eta_{jk}(x)\}f_{jk}(x)dx;
+\end{align*}
 
-Another concern of incorporating the subgroup result is oriented from the reporting bias. This may occur when the subgroup result is reported inconsistently without sufficient information of study or insufficient pre-specified outcomes were reported, which means when this kind of information was selected into the meta-analysis, the synthetic evidence was not reliable. Nonetheless, it has been demonstrated that the adoption of multivariate NMA could eliminate the influence of outcome reporting bias. (hwang2018)
+The configurations of models above were as specified:  
+\
+**individual-level model:**  
+1. $y_{ijk}$ and $X_{ijk}$ are the responses and covariates of patients i for treatment k in study j;  
+2. $\pi_{Ind}$ is the likelihood distribution of individual-level model; $\theta_{\cdot jk}$ is the conditional average outcome of patients I of treatment k in study j;  
+3. g(*) is the link function of individual model;  
+4. $\eta_{jk}(x_{ijk})$ is the linear predictor of $X_{ijk}$; $\mu_j$ is the baseline results of study j; $x_{ijk}^T$ is algebra expression to represent the transposed $X_{ijk}$, $\beta$ are the coefficients matrix of covariates;  
+5. $\gamma_k$ is the effect of treatment k compared to the referenced treatment.    
+\
+**aggregate-level model:**  
+1. $\pi_{Agg}$ is the likelihood distribution of individual-level model; $\theta_{\cdot jk}$ is the marginal average outcome of treatment k in study j;   
+2. $y_{.jk}$ is the outcome of aggregate model;  
+3. $\mathfrak{X}$ is the support of X; $f_{jk}(x)$ is the function of covariates of treatment k in study j;  
+4. $g^{-1}\{\eta_{jk}(x)\}$ is the inverse function of linear predictor.  
+\
+The individual-level model could be explicitly regarded as a generalized linear model based on IPD. Whereas the aggregate-level model was derived in an intuitive way. Based on the probability theory, the marginal probability of $X$ is calculated by assessing the conditional likelihood of $X$ given a specific value of $Y$ and then averaging this conditional probability over the whole distribution of Y. The equation is as follows:  
+\begin{align*}
+p_X(x) = \int_{x}p_{X|Y}(x|y)p_{Y}(y)dy
+\end{align*}
+\
+Thus, the novel point generated by the Jackson et al. is $\theta_{\cdot jk}$ (the marginal average outcome of treatment k in study j) could also be calculated by this theory[@RN132]. The equation could also be rewritten as $\theta_{\cdot jk} = \int_{\mathfrak{X}} \theta_{ijk}f_{jk}(x)dx = E_x(\theta_{ijk|kth\:treatment,\:jth\:study})$, then to generate the aggregate-level likelihood. That is ML-NMR accommodates the aggregate-level data into the model by integrating individual-level model over the covariate distribution in each study of aggregate study. To address the time-consuming issue of traditional integration, the quasi-Monte-Carlo sampling (QMC) was utilized to approximate the conditional average outcome more efficient by using a quasi-random sample of points (xxx). Using QR-decomposition and centering made the integral computation more efficient.
+\
 
-Furthermore, the availability of subgroup results also halts the implementation of this method. Typically, subgroup analysis was conducted for multiple baseline characteristics no matter what pre-specified analysis or post-hoc analysis. Unlike post-hoc analysis what we did in this study, it could be more challenge to collect enough pre-specified subgroup results.
+#	Results
 
-The limitations mentioned above lead to further investigation for this extended application. It could be possible to accommodate multiple subgroups by estimating correlations of subgroup effects given the correlations between multiple subgroup factors are assumed exchangeable. Furthermore, regarding the availability of subgroup results, we could also investigate to combine the aggregate-level baseline characteristics only in the ML-NMR framework assuming the correlations between baseline characteristics are exchangeable.
+## Comparisons of treatment-covariate interactions
+
+Figure \@ref(fig:fig2) showed the estimations of treatment-covariate interactions in three scenarios when subgroup effect was age. Unequivocally, the estimation of interaction in the base scenario (e.g. age-TNFa block estimation: -0.269 (95% CI: -0.418, -0.12)) was the most precise compared with other two scenarios, followed by the subgroup scenario (e.g. age-TNFa block estimation: -0.388 (95% CI: -0.58, -0.212)) and then aggregate scenario (e.g. age-TNFa block estimation: -0.425 (95% CI: -0.696, -0.162)). This result also echoed the argument that IPD meta-analysis is the gold standard of evidence synthesis (xxx). Notably, it is evident that differences of estimations existed between these three scenarios, which were reflected in the narrower interval of coefficients of covariates, covariate-treatment interactions in the subgroup set compared to the aggregate set. Furthermore, the estimations in the subgroup scenario were much closer to the base case than aggregate scenario.
+
+```{r fig2, fig.cap = "coefficients of treatment-covariate interactions", fig.height=6, fig.width=8, echo=FALSE, fig.pos = "H", fig.align = "!c", message=FALSE, warning=FALSE}
+
+load("study1_age.RData")
+
+study1_age
+
+```
+
+To confirm the consistency of result generated by this extended approach, we conducted same simulation choosing duration of psoriasis as subgroup effect. The forest plot of treatment-covariate interactions was shown in Figure \@ref(fig:fig3) Generally, the results are similar to the simulation with age. The precision of estimation in the base scenario is the most accurate. Compared with the aggregate scenario, the estimation in the subgroup scenario was more precise and closer to the estimations in the base scenario.
+
+```{r fig3, fig.cap = "coefficients of treatment-covariate interactions", fig.height=6, fig.width=8, echo=FALSE, fig.pos = "H", fig.align = "!c", message=FALSE, warning=FALSE}
+
+load("study2_durn.RData")
+
+study2_durn
+
+```
+
+## Comparison of population-adjusted relative treatment effects
+
+Figure \@ref(fig:fig4) illustrated the population-adjusted relative treatment effect compared to the placebo treatment. On the one hand, compared to the results of covariate-treatment interaction, the differences of estimations from three scenarios were relatively less differential though the estimations from base case was always the most accurate and stable. On another hand, the precision of estimations from subgroup scenario was slightly better than aggregate scenario. Specifically, for treatment IXE_Q4W, the difference between the range of 95% CI in the subgroup scenario (age: 2.262-2.923) and aggregate scenario (2.3-3.038) were relatively visible. Thus, it showed that the impact of subgroup-level data on the calibration of relative treatment effects might not be so strong but still could be differentiated. Respecting the simulation with duration of psoriasis, though we could still detect the difference between three scenarios, the differences between subgroup scenario and aggregate scenario were not much obvious as Figure \@ref(fig:fig5) shown.
+
+```{r fig4, fig.cap = "Population-adjusted relative treatment effects", fig.height=6, fig.width=8, echo=FALSE, fig.pos = "H", fig.align = "!c", message=FALSE, warning=FALSE}
+
+load("study1_rr.RData")
+
+study1_rr
+
+```
+
+```{r fig5, fig.cap = "Population-adjusted relative treatment effects", fig.height=6, fig.width=8, echo=FALSE, fig.pos = "H", fig.align = "!c", message=FALSE, warning=FALSE}
+
+load("study2_rr.RData")
+
+study2_rr
+
+```
+
+#	Discussion
+
+This study proposes an extension of the ML-NMR to accommodate the subgroup-level data with IPD and aggregate data in the network meta-analysis and showed the whole process step by step. It is notable that this is the first study that explores to introduce the subgroup-level data in the network meta-analysis based on our current literature search. Although subgroup analyses are widely conducted in the statistical analysis report in the clinical trial, researchers tends to doubt the validity of it rather than to investigate the value behind it due to several reasons (xxx). This approach is invalidated by comparing the population-adjusted relative treatment effects and covariate-treatment interactions in three scenarios. In the base scenario, with all IPD in the ML-NMR, the value of IPD was confirmed again as its most precise estimation of interest. In the subgroup scenario and aggregate scenario, it was affirmed that the input of subgroup level data could provide a more precise estimate of population-adjusted relative treatment effects and covariate-treatment interactions compared to the conventional meta-analysis. Thus, aside from inherent advantages of ML-NMR method (xxx), this extension is crucial considering the limited availability of clinical trial data. 
+
+However, one limitation of this extension is that we only involve a single subgroup effect into this simulation. Although we conducted it twice with different subgroup effects to confirm the results, it is encouraged that the simulation could be generalized to include more subgroup effects as well as multiple subgroup effects to validate this extension. When multiple subgroup effects are considered, the subgroup-level data could be reported factorially (e.g. age and sex: younger and female; younger and male; older and female, older and male) then we need to consider exchangeable correlation between subgroup effects across studies (xxx). Besides, care is particularly required in terms of the reporting bias of subgroup-level data This bias may occur when the subgroup-level data is reported inconsistently without sufficient information of study or insufficient pre-specified outcomes were reported, which means when this kind of information was selected into the meta-analysis, the estimation is biased. Nonetheless, it has been demonstrated that the adoption of multivariate NMA could eliminate the influence of outcome reporting bias by borrowing strength from other outcomes (hwang2018). Since only single subgroup effect was considered in this simulation, this may also incur a underlying reporting bias of our study result. 
+
+Generally, the baseline characteristics information will be published by subgroups as a summary table. As we mentioned in the Data section, the data format of subgroup-level data should be consistent with the IPD which may halt the application of this extension. Since different study may have different inclusion and exclusion criteria as well as reporting preference. For example, the age group in study A might be divided into "18-34", "35-44", "45-54", "54-64", and "65+" while in another study, it is divided into "20-30", "30-40", "40-50", "50+". Therefore the available subgroup-level data might be limited by this assumption and also needs more work for data preparation. Unlike what we did in this study, it is irrational to transform the IPD into subgroup-level data and then include it in the practical work as IPD is more valuable than subgroup-level data. Thus, it is also encouraged to compare the model results with all available UPD to that with all available IPD and subgroup level data.
 
 # Conclusions
 
-To our knowledge, this is the first study that combine the subgroup results with IPD, and aggregate-level data in the network meta-analysis. We demonstrated this extended approach in a tutorial style with the existing simulated data and R package. Also, we are able to show that the extra benefits of subgroup results in the ML-NMR, providing a more precise estimation of covariate-treatment interaction and population-adjusted relative treatment effects compared to the traditional meta-analysis. Although this extension still needs to be confirmed with more simulations, we expect that our findings will encourage people to consider this extended approach when come across the subgroup results in the meta-analysis, at least in sensitivity analyses and exploratory analyses. We also believe this simulation study could help increase application of ML-NMR in the academia and industry through its flexibility and validated strengths.
+This method introduced here just serves as a starting point for researchers to investigate the possibility of combining all available published data in the process of evidence synthesis. To our knowledge, this is the first study that combine the subgroup-level data with IPD, and aggregate-level data in the network meta-analysis. We demonstrated this extended approach in a tutorial style with the existing simulated data and R package. Also, we are able to show that the extra benefits of subgroup-level data in the ML-NMR, providing a more precise estimation of covariate-treatment interaction and population-adjusted relative treatment effects compared to the traditional meta-analysis. Although this extension still needs to be confirmed with more simulations, we expect that our findings will encourage people to consider this extended approach when come across the subgroup-level data in the meta-analysis, at least in sensitivity analyses and exploratory analyses. We also believe this simulation study could help increase application of ML-NMR in the academia and industry through its flexibility and validated strength.
 
