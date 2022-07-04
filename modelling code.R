@@ -37,7 +37,7 @@ full_ipd <- filter(full_ipd, complete) %>%
          sub_age = ifelse(age >= 46, "gt or eq 46", "lt 46"),
          sub_durn = ifelse(durnpso < 17, "lt 17", "ge 17"))
 
-full_age <- plaque_psoriasis_agd
+full_agd <- plaque_psoriasis_agd
 #####################################################################
 ##                          Data preparation                       ##
 #####################################################################
@@ -56,6 +56,7 @@ sub_ipd <- full_ipd %>%
     trtclass = case_when(trtn == 1 ~ "Placebo",
                          trtn %in% c(2, 3, 5, 6, 7) ~ "IL blocker",
                          trtn == 4 ~ "TNFa blocker"))
+
 
 ## subgroup result generated from IPD
 ## five covariate durnpso, prevsys, bsa, weight, psa, age
